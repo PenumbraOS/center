@@ -3,7 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { usePin } from "../hooks";
 import { fetchAllInstallerAssets } from "../install/assets";
 import { getBrowserSupport } from "../install/browserSupport";
-import { DEFAULT_REMOTE_ADB_AUTH_URL } from "../install/constants";
+import {
+  DEFAULT_REMOTE_ADB_AUTH_URL,
+  EXPLOIT_PACKAGE,
+  HOOK_PACKAGE,
+  INJECTOR_PACKAGE,
+  INSTALLER_PACKAGE,
+} from "../install/constants";
 import { installHookApk, installInjectorApk } from "../install/hookInstaller";
 import {
   bootstrapSystemInjector,
@@ -656,6 +662,7 @@ export default function InstallPage() {
     });
 
     try {
+      const currentStatus = statusSummary;
       addLog("info", "Fetching installer assets from the current site...");
       const assets = await fetchAllInstallerAssets();
       logInfo("installer", "Fetched installer assets", {
@@ -667,7 +674,7 @@ export default function InstallPage() {
 
       const progressLogger = createInstallProgressLogger(addLog);
 
-      if (!(statusSummary?.installerInstalled ?? false)) {
+      if (!(currentStatus?.installerInstalled ?? false)) {
         setStage("bootstrap");
         addLog("info", "Bootstrapping shared installer onto the device...");
         addLog(
@@ -687,6 +694,44 @@ export default function InstallPage() {
         addLog("success", "Shared installer bootstrapped successfully.");
       } else {
         addLog("info", "Shared installer already present. Skipping bootstrap.");
+      }
+
+      const packagesToRemove = [
+        {
+          packageName: INJECTOR_PACKAGE,
+          installed: currentStatus?.injectorInstalled ?? false,
+          label: "Injector APK",
+        },
+        {
+          packageName: HOOK_PACKAGE,
+          installed: currentStatus?.hookInstalled ?? false,
+          label: "Hook APK",
+        },
+      ];
+
+      let removedAny = false;
+      for (const entry of packagesToRemove) {
+        if (!entry.installed) {
+          continue;
+        }
+
+        addLog("info", `Removing existing ${entry.label} (${entry.packageName}) before reinstall...`);
+        await transport.uninstallPackage(entry.packageName);
+        addLog("success", `Removed existing ${entry.label}.`);
+        removedAny = true;
+      }
+
+      if (removedAny) {
+        setStatusSummary((prev) =>
+          prev
+            ? {
+                ...prev,
+                hookInstalled: false,
+                injectorInstalled: false,
+              }
+            : prev,
+        );
+        addLog("success", "Pre-install hook stack cleanup complete.");
       }
 
       setStage("install-hook");
@@ -759,22 +804,22 @@ export default function InstallPage() {
     try {
       const packagesToRemove = [
         {
-          packageName: "com.penumbraos.hook.injector",
+          packageName: INJECTOR_PACKAGE,
           installed: currentStatus.injectorInstalled,
           label: "Injector APK",
         },
         {
-          packageName: "com.penumbraos.hook",
+          packageName: HOOK_PACKAGE,
           installed: currentStatus.hookInstalled,
           label: "Hook APK",
         },
         {
-          packageName: "com.penumbraos.systeminjector.exploit",
+          packageName: EXPLOIT_PACKAGE,
           installed: currentStatus.exploitInstalled,
           label: "Exploit APK",
         },
         {
-          packageName: "com.penumbraos.systeminjector",
+          packageName: INSTALLER_PACKAGE,
           installed:
             uninstallSystemInjector && currentStatus.installerInstalled,
           label: "Shared installer",
