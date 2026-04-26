@@ -9,7 +9,9 @@ import {
   HOOK_PACKAGE,
   INJECTOR_PACKAGE,
   INSTALLER_PACKAGE,
+  PREINSTALL_DISABLE_PACKAGES,
 } from "../install/constants";
+import type { InstallerTransport } from "../install/transport";
 import { installHookApk, installInjectorApk } from "../install/hookInstaller";
 import {
   bootstrapSystemInjector,
@@ -644,6 +646,60 @@ export default function InstallPage() {
     }
   }
 
+  async function runDisableUserCommandWithRetry(
+    transport: InstallerTransport,
+    packageName: string,
+  ): Promise<void> {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const result = await transport.shell([
+          "pm",
+          "disable-user",
+          "--user",
+          "0",
+          packageName,
+        ]);
+        if (result.exitCode === 0) {
+          addLog("success", `Disabled ${packageName}.`);
+          return;
+        }
+
+        const message =
+          result.stderr.trim() ||
+          result.stdout.trim() ||
+          `disable-user failed for ${packageName}`;
+        if (attempt === 1) {
+          addLog(
+            "warning",
+            `Failed to disable ${packageName}. Retrying once... (${message})`,
+          );
+          continue;
+        }
+
+        addLog(
+          "warning",
+          `Failed to disable ${packageName} after retry. Continuing... (${message})`,
+        );
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt === 1) {
+          addLog(
+            "warning",
+            `Failed to disable ${packageName}. Retrying once... (${message})`,
+          );
+          continue;
+        }
+
+        addLog(
+          "warning",
+          `Failed to disable ${packageName} after retry. Continuing... (${message})`,
+        );
+        return;
+      }
+    }
+  }
+
   async function handleInstallHookStack() {
     const transport = transportRef.current;
     if (!transport) {
@@ -696,6 +752,12 @@ export default function InstallPage() {
         addLog("info", "Shared installer already present. Skipping bootstrap.");
       }
 
+      addLog("info", "Disabling telemetry before hook install...");
+      for (const packageName of PREINSTALL_DISABLE_PACKAGES) {
+        await runDisableUserCommandWithRetry(transport, packageName);
+      }
+      addLog("success", "Telemetry disable complete.");
+
       const packagesToRemove = [
         {
           packageName: INJECTOR_PACKAGE,
@@ -715,7 +777,10 @@ export default function InstallPage() {
           continue;
         }
 
-        addLog("info", `Removing existing ${entry.label} (${entry.packageName}) before reinstall...`);
+        addLog(
+          "info",
+          `Removing existing ${entry.label} (${entry.packageName}) before reinstall...`,
+        );
         await transport.uninstallPackage(entry.packageName);
         addLog("success", `Removed existing ${entry.label}.`);
         removedAny = true;

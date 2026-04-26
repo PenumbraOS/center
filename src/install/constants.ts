@@ -26,6 +26,14 @@ export const SOFT_REBOOT_STABILIZATION_MS = 10000;
 export const HOOK_PACKAGE = "com.penumbraos.hook";
 export const INJECTOR_PACKAGE = "com.penumbraos.hook.injector";
 
+export const PREINSTALL_DISABLE_PACKAGES = [
+  "hu.ma.ne.bort",
+  "hu.ma.ne.bort.ota",
+  "com.memfault.usagereporter",
+  "hu.ma.ne.metricreporter",
+  "humane.ota",
+] as const;
+
 export const DEFAULT_REMOTE_ADB_AUTH_URL = "https://adb.penumbraos.workers.dev";
 
 export const INSTALLER_ASSET_PATHS = {
