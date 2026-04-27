@@ -8,19 +8,31 @@ import {
   EXPLOIT_PACKAGE,
   HOOK_PACKAGE,
   INJECTOR_PACKAGE,
+  INSTALLER_LOG_BUFFER_MAX_LINES,
   INSTALLER_PACKAGE,
   PREINSTALL_DISABLE_PACKAGES,
 } from "../install/constants";
-import type { InstallerTransport } from "../install/transport";
+import {
+  appendDeviceLogcatLine,
+  appendInstallerMarker,
+  createInstallerLogEntry,
+  formatInstallerLogText,
+  saveAnnotatedDeviceLogcatTextFile,
+} from "../install/debugExport";
 import { installHookApk, installInjectorApk } from "../install/hookInstaller";
 import {
   bootstrapSystemInjector,
   getDeviceSummary,
   getInstallStatus,
+  type InstallStatus,
   type SystemInstallProgressEvent,
 } from "../install/systemInjector";
-import type { LogcatLine, LogcatStreamController } from "../install/transport";
-import type { InstallLogEntry, InstallStage } from "../install/types";
+import type { InstallerTransport, LogcatStreamController } from "../install/transport";
+import type {
+  InstallDeviceSummary,
+  InstallLogEntry,
+  InstallStage,
+} from "../install/types";
 import { WebUsbAdbTransport } from "../install/webUsbAdbTransport";
 import { logDebug, logError, logInfo, logWarn } from "../logging";
 
@@ -56,22 +68,12 @@ function formatElapsedSeconds(elapsedMs: number): string {
   return Math.max(1, Math.round(elapsedMs / 1000)).toString();
 }
 
-function trimLogcatBuffer(lines: LogcatLine[]): LogcatLine[] {
-  const maxLines = 20000;
-  if (lines.length <= maxLines) {
-    return lines;
-  }
-
-  return lines.slice(lines.length - maxLines);
-}
-
 function trimInstallerLogBuffer(lines: InstallLogEntry[]): InstallLogEntry[] {
-  const maxLines = 5000;
-  if (lines.length <= maxLines) {
+  if (lines.length <= INSTALLER_LOG_BUFFER_MAX_LINES) {
     return lines;
   }
 
-  return lines.slice(lines.length - maxLines);
+  return lines.slice(lines.length - INSTALLER_LOG_BUFFER_MAX_LINES);
 }
 
 function isNearBottom(element: HTMLDivElement, thresholdPx = 96): boolean {
@@ -81,20 +83,12 @@ function isNearBottom(element: HTMLDivElement, thresholdPx = 96): boolean {
   );
 }
 
-function downloadTextFile(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
 function createInstallProgressLogger(
-  addLog: (level: InstallLogEntry["level"], message: string) => void,
+  addLog: (
+    level: InstallLogEntry["level"],
+    message: string,
+  ) => void,
+  appendMarker: (eventName: string) => void,
 ) {
   let lastWaitProgressAt = 0;
   let lastPackageProgressAt = 0;
@@ -103,21 +97,25 @@ function createInstallProgressLogger(
   return (event: SystemInstallProgressEvent) => {
     switch (event.type) {
       case "verifying-bootstrap":
+        appendMarker(`VERIFYING_BOOTSTRAP: ${event.name}`);
         addLog("info", `Verifying shared installer before ${event.name}...`);
         return;
       case "transport-reconnect":
+        appendMarker(`TRANSPORT_RECONNECT: ${event.operation}`);
         addLog(
           "warning",
           `Socket closed during ${event.operation}; reconnecting ADB session (${event.attemptsSinceSuccess}/${event.maxAttemptsSinceSuccess})...`,
         );
         return;
       case "retrying-staging-write":
+        appendMarker(`RETRYING_STAGING_WRITE: ${event.name}`);
         addLog(
           "warning",
           `ADB session restored. Retrying on-device staged copy for ${event.name} (${event.attemptsSinceSuccess}/${event.maxAttemptsSinceSuccess})...`,
         );
         return;
       case "staging-start":
+        appendMarker(`STAGING_START: ${event.name}`);
         addLog(
           "info",
           `Preparing ${event.name}: upload to ${event.deviceTmpPath}, then stage to ${event.stagingFileUri} (${event.bytes} bytes)...`,
@@ -145,12 +143,15 @@ function createInstallProgressLogger(
         );
         return;
       case "staging-complete":
+        appendMarker(`STAGING_COMPLETE: ${event.name}`);
         addLog("success", `${event.name} staged on device.`);
         return;
       case "install-trigger-start":
+        appendMarker(`INSTALL_TRIGGER_START: ${event.name}`);
         addLog("info", `Requesting staged install for ${event.name}...`);
         return;
       case "install-trigger-complete":
+        appendMarker(`INSTALL_TRIGGER_COMPLETE: ${event.name}`);
         addLog("success", `Staged install triggered for ${event.name}.`);
         return;
       case "wait-system-ready": {
@@ -169,18 +170,21 @@ function createInstallProgressLogger(
         return;
       }
       case "soft-reboot-stabilizing":
+        appendMarker(`SOFT_REBOOT_STABILIZING: ${event.name}`);
         addLog(
           "warning",
           `System reported ready after ${event.reason}, waiting ${formatElapsedSeconds(event.delayMs)}s for stabilization before continuing ${event.name}...`,
         );
         return;
       case "soft-reboot-stabilized":
+        appendMarker(`SOFT_REBOOT_STABILIZED: ${event.name}`);
         addLog(
           "success",
           `Post-reboot stabilization finished for ${event.name} after ${event.reason}.`,
         );
         return;
       case "verify-package":
+        appendMarker(`VERIFY_PACKAGE: ${event.packageName}`);
         addLog(
           "info",
           `Verifying package ${event.packageName} after ${event.name} install...`,
@@ -199,9 +203,11 @@ function createInstallProgressLogger(
         return;
       }
       case "verify-package-complete":
+        appendMarker(`VERIFY_PACKAGE_COMPLETE: ${event.packageName}`);
         addLog("success", `Verified package ${event.packageName} on device.`);
         return;
       case "wait-provider-ready-start":
+        appendMarker(`WAIT_PROVIDER_READY_START: ${event.authority}`);
         addLog(
           "warning",
           `Waiting for staging provider ${event.authority} to become ready for the next install after ${event.name}...`,
@@ -221,6 +227,7 @@ function createInstallProgressLogger(
         return;
       }
       case "wait-provider-ready-complete":
+        appendMarker(`WAIT_PROVIDER_READY_COMPLETE: ${event.authority}`);
         addLog(
           "success",
           `Staging provider ${event.authority} is ready for the next install after ${event.name}.`,
@@ -236,46 +243,37 @@ export default function InstallPage() {
   const transportRef = useRef<WebUsbAdbTransport | null>(null);
   const logcatControllerRef = useRef<LogcatStreamController | null>(null);
   const installerLogContainerRef = useRef<HTMLDivElement | null>(null);
-  const logcatContainerRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollInstallerLogRef = useRef(true);
-  const shouldAutoScrollLogcatRef = useRef(true);
   const installerLogAutoScrollFrameRef = useRef<number | null>(null);
-  const logcatAutoScrollFrameRef = useRef<number | null>(null);
   const ignoreInstallerLogScrollRef = useRef(false);
-  const ignoreLogcatScrollRef = useRef(false);
-  const logcatBufferRef = useRef<LogcatLine[]>([]);
-  const flushLogcatFrameRef = useRef<number | null>(null);
 
   const support = useMemo(() => getBrowserSupport(), []);
-  const [stage, setStage] = useState<InstallStage>("browser-check");
+  const [stage, setStageState] = useState<InstallStage>("browser-check");
   const [remoteServer, setRemoteServer] = useState("");
   const [remoteAdbAuthUrl, setRemoteAdbAuthUrl] = useState(
     DEFAULT_REMOTE_ADB_AUTH_URL,
   );
   const [logs, setLogs] = useState<InstallLogEntry[]>([]);
-  const [logcatLines, setLogcatLines] = useState<LogcatLine[]>([]);
   const [showInstallerLogJumpButton, setShowInstallerLogJumpButton] =
     useState(false);
-  const [showLogcatJumpButton, setShowLogcatJumpButton] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<{
     serial: string;
     name: string;
   } | null>(null);
-  const [deviceSummary, setDeviceSummary] = useState<{
-    model: string;
-    product: string;
-    buildFingerprint: string;
-  } | null>(null);
-  const [statusSummary, setStatusSummary] = useState<{
-    installerInstalled: boolean;
-    exploitInstalled: boolean;
-    hookInstalled: boolean;
-    injectorInstalled: boolean;
-  } | null>(null);
+  const [deviceSummary, setDeviceSummary] = useState<InstallDeviceSummary | null>(
+    null,
+  );
+  const [statusSummary, setStatusSummary] = useState<InstallStatus | null>(null);
   const [uninstallSystemInjector, setUninstallSystemInjector] = useState(true);
   const [showRebootPrompt, setShowRebootPrompt] = useState(false);
+  const [hasAnnotatedLogcat, setHasAnnotatedLogcat] = useState(false);
+  const stageRef = useRef<InstallStage>("browser-check");
+  const installerLogExportRef = useRef<InstallLogEntry[]>([]);
+  const deviceLogcatExportRef = useRef<string[]>([]);
+  const hasAnnotatedLogcatRef = useRef(false);
+  const captureAnnotatedLogcatRef = useRef(false);
 
   useEffect(() => {
     logInfo("installer", "Installer page mounted", {
@@ -290,13 +288,6 @@ export default function InstallPage() {
       if (installerLogAutoScrollFrameRef.current !== null) {
         window.cancelAnimationFrame(installerLogAutoScrollFrameRef.current);
       }
-      if (logcatAutoScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(logcatAutoScrollFrameRef.current);
-      }
-      if (flushLogcatFrameRef.current !== null) {
-        window.cancelAnimationFrame(flushLogcatFrameRef.current);
-      }
-      logcatBufferRef.current = [];
       const logcatController = logcatControllerRef.current;
       if (logcatController) {
         void logcatController.stop();
@@ -307,6 +298,24 @@ export default function InstallPage() {
       }
     };
   }, [support]);
+
+  function appendInstallerEventMarker(eventName: string) {
+    if (!captureAnnotatedLogcatRef.current) {
+      return;
+    }
+
+    appendInstallerMarker(deviceLogcatExportRef.current, eventName);
+    if (!hasAnnotatedLogcatRef.current) {
+      hasAnnotatedLogcatRef.current = true;
+      setHasAnnotatedLogcat(true);
+    }
+  }
+
+  function transitionStage(nextStage: InstallStage) {
+    stageRef.current = nextStage;
+    setStageState(nextStage);
+    appendInstallerEventMarker(`STAGE_TRANSITION: ${nextStage}`);
+  }
 
   function scheduleInstallerLogAutoScroll() {
     if (installerLogAutoScrollFrameRef.current !== null) {
@@ -330,26 +339,6 @@ export default function InstallPage() {
     );
   }
 
-  function scheduleLogcatAutoScroll() {
-    if (logcatAutoScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(logcatAutoScrollFrameRef.current);
-    }
-
-    logcatAutoScrollFrameRef.current = window.requestAnimationFrame(() => {
-      logcatAutoScrollFrameRef.current = null;
-      const container = logcatContainerRef.current;
-      if (!container) {
-        return;
-      }
-
-      ignoreLogcatScrollRef.current = true;
-      container.scrollTop = container.scrollHeight;
-      window.requestAnimationFrame(() => {
-        ignoreLogcatScrollRef.current = false;
-      });
-    });
-  }
-
   useLayoutEffect(() => {
     if (shouldAutoScrollInstallerLogRef.current) {
       scheduleInstallerLogAutoScroll();
@@ -359,25 +348,10 @@ export default function InstallPage() {
     }
   }, [logs]);
 
-  useLayoutEffect(() => {
-    if (shouldAutoScrollLogcatRef.current) {
-      scheduleLogcatAutoScroll();
-      setShowLogcatJumpButton(false);
-    } else {
-      setShowLogcatJumpButton(true);
-    }
-  }, [logcatLines]);
-
   function jumpInstallerLogToLatest() {
     shouldAutoScrollInstallerLogRef.current = true;
     setShowInstallerLogJumpButton(false);
     scheduleInstallerLogAutoScroll();
-  }
-
-  function jumpLogcatToLatest() {
-    shouldAutoScrollLogcatRef.current = true;
-    setShowLogcatJumpButton(false);
-    scheduleLogcatAutoScroll();
   }
 
   function handleInstallerLogScroll() {
@@ -395,40 +369,15 @@ export default function InstallPage() {
     setShowInstallerLogJumpButton(!nearBottom);
   }
 
-  function handleLogcatScroll() {
-    if (ignoreLogcatScrollRef.current) {
-      return;
-    }
-
-    const container = logcatContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    const nearBottom = isNearBottom(container);
-    shouldAutoScrollLogcatRef.current = nearBottom;
-    setShowLogcatJumpButton(!nearBottom);
-  }
-
-  function formatInstallerLogText() {
-    return logs
-      .map((entry) => `[${entry.timestamp}] [${entry.level}] ${entry.message}`)
-      .join("\n");
-  }
-
-  function formatLogcatText() {
-    return logcatLines
-      .map((line) => `[${line.timestamp}] ${line.text}`)
-      .join("\n");
-  }
-
   async function copyTextToClipboard(content: string) {
     await navigator.clipboard.writeText(content);
   }
 
   async function handleCopyInstallerLog() {
     try {
-      await copyTextToClipboard(formatInstallerLogText());
+      await copyTextToClipboard(
+        formatInstallerLogText(installerLogExportRef.current),
+      );
       addLog("success", "Copied installer log to clipboard.");
     } catch (error) {
       logError("installer", "Failed to copy installer log", error, {
@@ -438,57 +387,64 @@ export default function InstallPage() {
     }
   }
 
-  async function handleCopyLogcat() {
-    try {
-      await copyTextToClipboard(formatLogcatText());
-      addLog("success", "Copied device logcat to clipboard.");
-    } catch (error) {
-      logError("installer", "Failed to copy device logcat", error, {
-        path: window.location.pathname,
-      });
-      addLog("warning", "Could not copy device logcat to clipboard.");
+  async function ensureAnnotatedLogcatCapture(transport: WebUsbAdbTransport) {
+    const existingController = logcatControllerRef.current;
+    if (existingController) {
+      await existingController.stop();
+      logcatControllerRef.current = null;
     }
+
+    captureAnnotatedLogcatRef.current = true;
+    deviceLogcatExportRef.current = [];
+    hasAnnotatedLogcatRef.current = false;
+    setHasAnnotatedLogcat(false);
+    await startLogcatStreaming(transport);
+    appendInstallerEventMarker("INSTALL_CAPTURE_STARTED");
   }
 
-  function handleDownloadInstallerLog() {
-    downloadTextFile("installer-log.txt", formatInstallerLogText());
+  async function stopAnnotatedLogcatCapture() {
+    captureAnnotatedLogcatRef.current = false;
+    const existingController = logcatControllerRef.current;
+    if (!existingController) {
+      return;
+    }
+
+    await existingController.stop();
+    logcatControllerRef.current = null;
   }
 
-  function handleDownloadLogcat() {
-    downloadTextFile("device-logcat.txt", formatLogcatText());
+  function handleSaveAnnotatedLogcat() {
+    saveAnnotatedDeviceLogcatTextFile(deviceLogcatExportRef.current);
+    addLog("success", "Saved annotated device logcat.");
   }
 
-  function addLog(level: InstallLogEntry["level"], message: string) {
-    setLogs((prev) =>
-      trimInstallerLogBuffer([
-        ...prev,
-        {
-          id: `${Date.now()}-${prev.length}`,
-          timestamp: new Date().toLocaleTimeString(),
-          level,
-          message,
-        },
-      ]),
-    );
+  function addLog(
+    level: InstallLogEntry["level"],
+    message: string,
+  ) {
+    const entry = createInstallerLogEntry(level, message);
+    installerLogExportRef.current.push(entry);
+
+    setLogs((prev) => trimInstallerLogBuffer([...prev, entry]));
 
     if (level === "error") {
       logError("installer", message, {
-        stage,
+        stage: stageRef.current,
         path: window.location.pathname,
       });
     } else if (level === "warning") {
       logWarn("installer", message, {
-        stage,
+        stage: stageRef.current,
         path: window.location.pathname,
       });
     } else if (level === "success") {
       logInfo("installer", message, {
-        stage,
+        stage: stageRef.current,
         path: window.location.pathname,
       });
     } else {
       logInfo("installer", message, {
-        stage,
+        stage: stageRef.current,
         path: window.location.pathname,
       });
     }
@@ -501,47 +457,15 @@ export default function InstallPage() {
       logcatControllerRef.current = null;
     }
 
-    if (flushLogcatFrameRef.current !== null) {
-      window.cancelAnimationFrame(flushLogcatFrameRef.current);
-      flushLogcatFrameRef.current = null;
-    }
-    logcatBufferRef.current = [];
-    shouldAutoScrollLogcatRef.current = true;
-    setShowLogcatJumpButton(false);
-    setLogcatLines([]);
-    addLog(
-      "info",
-      "Starting filtered device logcat stream (SystemInjector/Exploit tags plus global warnings/errors)...",
-    );
-
     try {
-      const flushBufferedLogcatLines = () => {
-        flushLogcatFrameRef.current = null;
-        const bufferedLines = logcatBufferRef.current;
-        if (bufferedLines.length === 0) {
-          return;
-        }
-
-        logcatBufferRef.current = [];
-        setLogcatLines((prev) => trimLogcatBuffer([...prev, ...bufferedLines]));
-      };
-
-      const scheduleLogcatFlush = () => {
-        if (flushLogcatFrameRef.current !== null) {
-          return;
-        }
-
-        flushLogcatFrameRef.current = window.requestAnimationFrame(
-          flushBufferedLogcatLines,
-        );
-      };
-
       const controller = await transport.startLogcatStream((line) => {
-        logcatBufferRef.current.push(line);
-        scheduleLogcatFlush();
+        appendDeviceLogcatLine(deviceLogcatExportRef.current, line);
+        if (!hasAnnotatedLogcatRef.current) {
+          hasAnnotatedLogcatRef.current = true;
+          setHasAnnotatedLogcat(true);
+        }
       });
       logcatControllerRef.current = controller;
-      addLog("success", "Filtered device logcat streaming started.");
     } catch (error) {
       logError("installer", "Failed to start device logcat stream", error, {
         path: window.location.pathname,
@@ -560,7 +484,7 @@ export default function InstallPage() {
 
     setIsBusy(true);
     setError(null);
-    setStage("usb-connect");
+    transitionStage("usb-connect");
     logInfo("installer", "Connect device requested", {
       support,
       path: window.location.pathname,
@@ -598,7 +522,6 @@ export default function InstallPage() {
         "success",
         `Connected to ${info.name} (${info.serial || "no-serial"}).`,
       );
-      await startLogcatStreaming(transport);
 
       const summary = await getDeviceSummary(transport);
       setDeviceSummary(summary);
@@ -607,7 +530,7 @@ export default function InstallPage() {
       });
       addLog("info", `Detected model: ${summary.model || "unknown"}`);
 
-      setStage("status-check");
+      transitionStage("status-check");
       addLog("info", "Checking installation status on device...");
       const status = await getInstallStatus(transport);
       setStatusSummary(status);
@@ -635,7 +558,7 @@ export default function InstallPage() {
       const message =
         err instanceof Error ? err.message : "Failed to connect to device.";
       setError(message);
-      setStage("error");
+      transitionStage("error");
       logError("installer", "Connect device failed", err, {
         stage: "usb-connect",
         path: window.location.pathname,
@@ -719,6 +642,7 @@ export default function InstallPage() {
 
     try {
       const currentStatus = statusSummary;
+      await ensureAnnotatedLogcatCapture(transport);
       addLog("info", "Fetching installer assets from the current site...");
       const assets = await fetchAllInstallerAssets();
       logInfo("installer", "Fetched installer assets", {
@@ -728,10 +652,13 @@ export default function InstallPage() {
         injectorApkBytes: assets.injectorApk.size,
       });
 
-      const progressLogger = createInstallProgressLogger(addLog);
+      const progressLogger = createInstallProgressLogger(
+        addLog,
+        appendInstallerEventMarker,
+      );
 
       if (!(currentStatus?.installerInstalled ?? false)) {
-        setStage("bootstrap");
+        transitionStage("bootstrap");
         addLog("info", "Bootstrapping shared installer onto the device...");
         addLog(
           "warning",
@@ -799,14 +726,14 @@ export default function InstallPage() {
         addLog("success", "Pre-install hook stack cleanup complete.");
       }
 
-      setStage("install-hook");
+      transitionStage("install-hook");
       addLog("info", "Installing hook APK through system-injector...");
       await installHookApk(transport, assets.hookApk, {
         onProgress: progressLogger,
       });
       addLog("success", "Hook APK installed.");
 
-      setStage("install-injector");
+      transitionStage("install-injector");
       addLog("info", "Installing injector APK through system-injector...");
       await installInjectorApk(transport, assets.injectorApk, {
         onProgress: progressLogger,
@@ -819,7 +746,7 @@ export default function InstallPage() {
         status: updatedStatus,
       });
 
-      setStage("activate");
+      transitionStage("activate");
       addLog(
         "info",
         "Hook stack installed. Immediate activation and backend-target configuration are next steps.",
@@ -828,13 +755,14 @@ export default function InstallPage() {
       const message =
         err instanceof Error ? err.message : "Failed to install hook stack.";
       setError(message);
-      setStage("error");
+      transitionStage("error");
       logError("installer", "Install hook stack failed", err, {
-        stage,
+        stage: stageRef.current,
         path: window.location.pathname,
       });
       addLog("error", message);
     } finally {
+      await stopAnnotatedLogcatCapture();
       setIsBusy(false);
     }
   }
@@ -859,7 +787,6 @@ export default function InstallPage() {
     setIsBusy(true);
     setError(null);
     setShowRebootPrompt(false);
-    setStage("uninstall-hook");
     logInfo("installer", "Uninstall hook stack requested", {
       statusSummary: currentStatus,
       uninstallSystemInjector,
@@ -867,6 +794,9 @@ export default function InstallPage() {
     });
 
     try {
+      await ensureAnnotatedLogcatCapture(transport);
+      transitionStage("uninstall-hook");
+
       const packagesToRemove = [
         {
           packageName: INJECTOR_PACKAGE,
@@ -923,18 +853,19 @@ export default function InstallPage() {
         "warning",
         "Packages removed. Reboot the device to fully deactivate hooks.",
       );
-      setStage("status-check");
+      transitionStage("status-check");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to uninstall hook stack.";
       setError(message);
-      setStage("error");
+      transitionStage("error");
       logError("installer", "Uninstall hook stack failed", err, {
         uninstallSystemInjector,
         path: window.location.pathname,
       });
       addLog("error", message);
     } finally {
+      await stopAnnotatedLogcatCapture();
       setIsBusy(false);
     }
   }
@@ -965,12 +896,12 @@ export default function InstallPage() {
       setConnectedDevice(null);
       setDeviceSummary(null);
       setStatusSummary(null);
-      setStage("usb-connect");
+      transitionStage("usb-connect");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to reboot device.";
       setError(message);
-      setStage("error");
+      transitionStage("error");
       logError("installer", "Device reboot failed", err, {
         path: window.location.pathname,
       });
@@ -991,7 +922,7 @@ export default function InstallPage() {
 
     setIsBusy(true);
     setError(null);
-    setStage("connect-server");
+    transitionStage("connect-server");
     logInfo("installer", "Portal connect requested from installer", {
       normalized,
       path: window.location.pathname,
@@ -1001,7 +932,7 @@ export default function InstallPage() {
       addLog("info", `Connecting portal to ${normalized}...`);
       await connect(normalized);
       addLog("success", "Portal connected to remote server.");
-      setStage("complete");
+      transitionStage("complete");
       navigate("/gallery");
     } catch (err) {
       const message =
@@ -1009,7 +940,7 @@ export default function InstallPage() {
           ? err.message
           : "Failed to connect portal to server.";
       setError(message);
-      setStage("error");
+      transitionStage("error");
       logError("installer", "Portal connect from installer failed", err, {
         normalized,
         path: window.location.pathname,
@@ -1273,6 +1204,7 @@ export default function InstallPage() {
               >
                 Connect portal to server
               </button>
+
             </div>
 
             <label className="flex items-center gap-3 text-sm text-neutral-300">
@@ -1352,11 +1284,11 @@ export default function InstallPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleDownloadInstallerLog}
-                  disabled={logs.length === 0}
-                  className="rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleSaveAnnotatedLogcat}
+                  disabled={!hasAnnotatedLogcat}
+                  className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-medium text-blue-200 transition-colors hover:border-blue-700 hover:bg-blue-950/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Download
+                  Save device logcat
                 </button>
                 {showInstallerLogJumpButton && logs.length > 0 && (
                   <button
@@ -1404,74 +1336,6 @@ export default function InstallPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Device logcat</h2>
-                <span className="text-xs uppercase tracking-wide text-neutral-500">
-                  {logcatLines.length} lines
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyLogcat}
-                  disabled={logcatLines.length === 0}
-                  className="rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Copy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadLogcat}
-                  disabled={logcatLines.length === 0}
-                  className="rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Download
-                </button>
-                {showLogcatJumpButton && logcatLines.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={jumpLogcatToLatest}
-                    className="rounded-lg border border-blue-700 px-3 py-2 text-xs font-medium text-blue-300 transition-colors hover:border-blue-500 hover:bg-blue-950/40"
-                  >
-                    Jump to latest
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {logcatLines.length === 0 ? (
-              <p className="text-sm text-neutral-500">
-                No device logcat output yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {showLogcatJumpButton && (
-                  <div className="text-xs text-blue-300">
-                    New device logcat lines are available below.
-                  </div>
-                )}
-                <div
-                  ref={logcatContainerRef}
-                  onScroll={handleLogcatScroll}
-                  className="max-h-[28rem] overflow-auto rounded-lg bg-neutral-950 px-4 py-3 font-mono text-xs text-neutral-300"
-                >
-                  {logcatLines.map((line) => (
-                    <div
-                      key={line.id}
-                      className="whitespace-pre-wrap break-words"
-                    >
-                      <span className="text-neutral-500">
-                        [{line.timestamp}]{" "}
-                      </span>
-                      <span>{line.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
         </aside>
       </div>
     </div>

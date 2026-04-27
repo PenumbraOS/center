@@ -36,6 +36,9 @@ export const PREINSTALL_DISABLE_PACKAGES = [
 
 export const DEFAULT_REMOTE_ADB_AUTH_URL = "https://adb.penumbraos.workers.dev";
 
+export const INSTALLER_LOG_BUFFER_MAX_LINES = 5000;
+export const DEVICE_LOGCAT_FILENAME = "device-logcat.txt";
+
 export const INSTALLER_ASSET_PATHS = {
   installerApk: "/installer/system-injector/installer-debug.apk",
   exploitApk: "/installer/system-injector/exploit-debug.apk",

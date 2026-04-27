@@ -19,6 +19,12 @@ export interface InstallLogEntry {
   message: string;
 }
 
+export interface InstallDeviceSummary {
+  model: string;
+  product: string;
+  buildFingerprint: string;
+}
+
 export interface BrowserSupportResult {
   supported: boolean;
   reasons: string[];
