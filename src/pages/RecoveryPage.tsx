@@ -26,6 +26,11 @@ function getRecoveryStageLabel(stage: InstallStage): string {
   }
 }
 
+function statusTone(installed: boolean, warning = false) {
+  if (!installed) return "app-tone-default";
+  return warning ? "app-tone-warning" : "app-tone-success";
+}
+
 export default function RecoveryPage() {
   const [stage, setStage] = useState<InstallStage>("usb-connect");
   const [remoteDevice, setRemoteDevice] = useState<{
@@ -81,8 +86,7 @@ export default function RecoveryPage() {
         device: info,
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to connect to device.";
+      const message = err instanceof Error ? err.message : "Failed to connect to device.";
       setError(message);
       setStage("error");
       addLog(message);
@@ -122,8 +126,7 @@ export default function RecoveryPage() {
           },
           {
             packageName: INSTALLER_PACKAGE,
-            installed:
-              uninstallSystemInjector && currentStatus.installerInstalled,
+            installed: uninstallSystemInjector && currentStatus.installerInstalled,
             label: "Shared installer",
           },
         ];
@@ -178,8 +181,7 @@ export default function RecoveryPage() {
       setStatusSummary(null);
       setStage("usb-connect");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to reboot device.";
+      const message = err instanceof Error ? err.message : "Failed to reboot device.";
       setError(message);
       setStage("error");
       addLog(message);
@@ -195,171 +197,154 @@ export default function RecoveryPage() {
     (statusSummary?.injectorInstalled ?? false);
 
   return (
-    <div className="flex flex-1 justify-center px-4 py-10">
-      <div className="w-full max-w-3xl space-y-8">
-        <div>
-          <Link
-            to="/install"
-            className="mb-6 inline-flex text-sm text-neutral-500 transition-colors hover:text-neutral-300"
-          >
-            ← Back to installer
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <Link to="/install" className="back-link">
+            <span aria-hidden="true">←</span>
+            <span>Back to installer</span>
           </Link>
-          <h1 className="text-4xl font-semibold tracking-tight">Recovery</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-neutral-400">
-            Remove installed components or reboot the device if you need to recover
-            from a failed install or undo the hook stack.
-          </p>
-        </div>
-
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 space-y-5">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">Device recovery</h2>
-            <p className="text-sm leading-6 text-neutral-400">
-              Connect the device, review the detected installed components, and then
-              remove what you no longer want.
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Recovery</h1>
+            <p className="app-page-copy">
+              Remove installed components or reboot the device if you need to recover
+              from a failed install or undo the hook stack.
             </p>
           </div>
+        </div>
+      </section>
 
-          <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-neutral-100">Current status</div>
-                <div className="text-sm text-neutral-400">
-                  {getRecoveryStageLabel(stage)}
+      <section className="app-page-content">
+        <div className="container app-flow" style={{ maxWidth: "56rem" }}>
+          <section className="app-panel app-flow">
+            <div className="app-flow app-flow--sm">
+              <h2 className="app-section-heading">Device recovery</h2>
+              <p className="app-section-copy">
+                Connect the device, review the detected installed components, and then
+                remove what you no longer want.
+              </p>
+            </div>
+
+            <div className="app-subpanel app-flow">
+              <div className="app-button-row app-button-row--between">
+                <div className="app-flow app-flow--sm">
+                  <div className="app-text-label">Current status</div>
+                  <div className="app-muted">{getRecoveryStageLabel(stage)}</div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleConnectDevice}
+                  disabled={isBusy}
+                  className="hero-cta app-button"
+                >
+                  {isBusy && stage === "usb-connect" ? "Connecting..." : "Connect device"}
+                </button>
               </div>
+
+              {remoteDevice && (
+                <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                  <div className="app-panel-title">{remoteDevice.name}</div>
+                  <div className="app-muted">{remoteDevice.serial || "Serial unavailable"}</div>
+                </div>
+              )}
+
+              {statusSummary && (
+                <div className="app-form-grid app-form-grid--two">
+                  <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                    <div className="app-text-label">Shared installer</div>
+                    <div className={statusTone(statusSummary.installerInstalled)}>
+                      {statusSummary.installerInstalled ? "Installed" : "Not present"}
+                    </div>
+                  </div>
+                  <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                    <div className="app-text-label">Exploit APK</div>
+                    <div className={statusTone(statusSummary.exploitInstalled, true)}>
+                      {statusSummary.exploitInstalled ? "Present" : "Not present"}
+                    </div>
+                  </div>
+                  <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                    <div className="app-text-label">Hook APK</div>
+                    <div className={statusTone(statusSummary.hookInstalled)}>
+                      {statusSummary.hookInstalled ? "Installed" : "Not present"}
+                    </div>
+                  </div>
+                  <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                    <div className="app-text-label">Injector APK</div>
+                    <div className={statusTone(statusSummary.injectorInstalled)}>
+                      {statusSummary.injectorInstalled ? "Installed" : "Not present"}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <label className="app-checkbox-row">
+              <input
+                type="checkbox"
+                checked={uninstallSystemInjector}
+                onChange={(e) => setUninstallSystemInjector(e.target.checked)}
+                disabled={isBusy}
+                className="app-checkbox"
+              />
+              <span>Also remove system-injector</span>
+            </label>
+
+            <div className="app-inline-actions">
               <button
                 type="button"
-                onClick={handleConnectDevice}
-                disabled={isBusy}
-                className="rounded-lg bg-neutral-100 px-4 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleUninstall}
+                disabled={isBusy || !statusSummary || !hasRecoveryTargets}
+                className="app-button app-button--danger"
               >
-                {isBusy && stage === "usb-connect" ? "Connecting..." : "Connect device"}
+                {isBusy && stage === "uninstall-hook"
+                  ? "Removing..."
+                  : "Remove installed components"}
               </button>
             </div>
 
-            {remoteDevice && (
-              <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm">
-                <div className="font-medium text-neutral-100">{remoteDevice.name}</div>
-                <div className="mt-1 text-neutral-400">
-                  {remoteDevice.serial || "Serial unavailable"}
+            {showRebootPrompt && (
+              <div className="app-notice app-notice--warning app-flow app-flow--sm">
+                <p>Removal finished. Reboot the device to fully deactivate hooks.</p>
+                <div className="app-inline-actions">
+                  <button
+                    type="button"
+                    onClick={handleReboot}
+                    disabled={isBusy}
+                    className="download-btn app-button app-button--small"
+                  >
+                    Reboot device now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRebootPrompt(false)}
+                    disabled={isBusy}
+                    className="app-button app-button--ghost"
+                  >
+                    I’ll reboot manually
+                  </button>
                 </div>
               </div>
             )}
 
-            {statusSummary && (
-              <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                <div className="rounded-lg bg-neutral-900 px-4 py-3">
-                  <div className="text-neutral-500">Shared installer</div>
-                  <div
-                    className={
-                      statusSummary.installerInstalled ? "text-green-400" : "text-neutral-300"
-                    }
-                  >
-                    {statusSummary.installerInstalled ? "Installed" : "Not present"}
+            {error && <p className="app-form-error">{error}</p>}
+          </section>
+
+          <section className="app-log-panel">
+            <h2 className="app-panel-title">Recovery log</h2>
+            {logs.length === 0 ? (
+              <p className="app-log-empty">No recovery activity yet.</p>
+            ) : (
+              <div className="app-log-list">
+                {logs.map((entry, index) => (
+                  <div key={`${index}-${entry}`} className="app-log-entry">
+                    <div className="app-log-entry__message">{entry}</div>
                   </div>
-                </div>
-                <div className="rounded-lg bg-neutral-900 px-4 py-3">
-                  <div className="text-neutral-500">Exploit APK</div>
-                  <div
-                    className={
-                      statusSummary.exploitInstalled ? "text-yellow-400" : "text-neutral-300"
-                    }
-                  >
-                    {statusSummary.exploitInstalled ? "Present" : "Not present"}
-                  </div>
-                </div>
-                <div className="rounded-lg bg-neutral-900 px-4 py-3">
-                  <div className="text-neutral-500">Hook APK</div>
-                  <div
-                    className={
-                      statusSummary.hookInstalled ? "text-green-400" : "text-neutral-300"
-                    }
-                  >
-                    {statusSummary.hookInstalled ? "Installed" : "Not present"}
-                  </div>
-                </div>
-                <div className="rounded-lg bg-neutral-900 px-4 py-3">
-                  <div className="text-neutral-500">Injector APK</div>
-                  <div
-                    className={
-                      statusSummary.injectorInstalled ? "text-green-400" : "text-neutral-300"
-                    }
-                  >
-                    {statusSummary.injectorInstalled ? "Installed" : "Not present"}
-                  </div>
-                </div>
+                ))}
               </div>
             )}
-          </div>
-
-          <label className="flex items-center gap-3 text-sm text-neutral-300">
-            <input
-              type="checkbox"
-              checked={uninstallSystemInjector}
-              onChange={(e) => setUninstallSystemInjector(e.target.checked)}
-              disabled={isBusy}
-              className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-neutral-100"
-            />
-            <span>Also remove system-injector</span>
-          </label>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleUninstall}
-              disabled={isBusy || !statusSummary || !hasRecoveryTargets}
-              className="rounded-lg border border-red-900 px-4 py-3 font-medium text-red-200 transition-colors hover:border-red-700 hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isBusy && stage === "uninstall-hook" ? "Removing..." : "Remove installed components"}
-            </button>
-          </div>
-
-          {showRebootPrompt && (
-            <div className="rounded-lg border border-yellow-800 bg-yellow-950/30 p-4 space-y-3 text-sm text-yellow-100">
-              <p>Removal finished. Reboot the device to fully deactivate hooks.</p>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleReboot}
-                  disabled={isBusy}
-                  className="rounded-lg border border-yellow-700 px-4 py-2 font-medium text-yellow-100 transition-colors hover:border-yellow-500 hover:bg-yellow-900/40 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Reboot device now
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRebootPrompt(false)}
-                  disabled={isBusy}
-                  className="rounded-lg border border-neutral-700 px-4 py-2 font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  I’ll reboot manually
-                </button>
-              </div>
-            </div>
-          )}
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
-        </section>
-
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Recovery log</h2>
-          {logs.length === 0 ? (
-            <p className="text-sm text-neutral-500">No recovery activity yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {logs.map((entry, index) => (
-                <div
-                  key={`${index}-${entry}`}
-                  className="rounded-lg bg-neutral-950 px-4 py-3 text-sm text-neutral-200"
-                >
-                  {entry}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
+          </section>
+        </div>
+      </section>
+    </>
   );
 }

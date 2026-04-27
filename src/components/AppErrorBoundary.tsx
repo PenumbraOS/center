@@ -30,14 +30,12 @@ export default class AppErrorBoundary extends Component<Props, State> {
   override render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-screen items-center justify-center px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-red-900/50 bg-neutral-900 p-6">
-            <h1 className="mb-3 text-2xl font-semibold tracking-tight text-red-400">
-              Something went wrong
-            </h1>
-            <p className="text-sm leading-6 text-neutral-300">
-              Pin Center hit an unexpected error. Open the browser console for
-              details and reload the page to try again.
+        <div className="app-error-shell">
+          <div className="app-danger-card app-error-card app-flow app-flow--sm">
+            <h1 className="app-page-title app-danger-title">Something went wrong</h1>
+            <p className="app-panel-copy">
+              PenumbraOS hit an unexpected error. Open the browser console for details
+              and reload the page to try again.
             </p>
           </div>
         </div>

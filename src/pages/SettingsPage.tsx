@@ -20,7 +20,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Editable form state — mirrors the UpdateSettingsRequest shape.
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -33,36 +32,26 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Populate form fields from fetched settings.
   const populateForm = useCallback((s: Settings) => {
     setProvider(s.llm.provider);
     setModel(s.llm.model);
-    setApiKey(""); // never pre-fill secrets
+    setApiKey("");
     setBaseUrl(s.llm.base_url ?? "");
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
-    setWeatherKey(""); // never pre-fill secrets
+    setWeatherKey("");
   }, []);
 
-  // When the provider dropdown changes, clear the API key (one provider's
-  // key doesn't work for another) and reset base_url.  If the user switches
-  // back to the original provider the fields reset to their server-side
-  // defaults, so the asterisk placeholder reappears for the key and the
-  // original base_url is restored.
   function handleProviderChange(next: string) {
     setProvider(next);
     setApiKey("");
     if (settings) {
-      setBaseUrl(
-        next === settings.llm.provider ? (settings.llm.base_url ?? "") : "",
-      );
+      setBaseUrl(next === settings.llm.provider ? (settings.llm.base_url ?? "") : "");
     } else {
       setBaseUrl("");
     }
   }
 
-  // True when the selected provider matches what the server currently has,
-  // meaning the server's stored API key is valid for this provider.
   const isOriginalProvider = settings != null && provider === settings.llm.provider;
 
   useEffect(() => {
@@ -89,14 +78,12 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, [client, populateForm]);
 
-  // Build the delta between current form state and loaded settings.
   function buildRequest(): UpdateSettingsRequest | null {
     if (!settings) return null;
 
     const req: UpdateSettingsRequest = {};
     let hasChanges = false;
 
-    // LLM
     const llm: UpdateSettingsRequest["llm"] = {};
     if (provider !== settings.llm.provider) {
       llm.provider = provider;
@@ -116,7 +103,6 @@ export default function SettingsPage() {
     }
     if (Object.keys(llm).length > 0) req.llm = llm;
 
-    // Server
     const server: UpdateSettingsRequest["server"] = {};
     if (displayName !== (settings.server.display_name ?? "")) {
       server.display_name = displayName;
@@ -128,7 +114,6 @@ export default function SettingsPage() {
     }
     if (Object.keys(server).length > 0) req.server = server;
 
-    // Weather
     if (weatherKey !== "") {
       req.weather = { pirate_weather_api_key: weatherKey };
       hasChanges = true;
@@ -161,8 +146,7 @@ export default function SettingsPage() {
         baseUrl: client.baseUrl,
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to save settings";
+      const message = err instanceof Error ? err.message : "Failed to save settings";
       logError("settings-page", "Failed to save settings", err, {
         baseUrl: client.baseUrl,
         request: req,
@@ -173,181 +157,183 @@ export default function SettingsPage() {
   }
 
   const isDirty = buildRequest() !== null;
-  const showBaseUrl =
-    provider === "openai-compatible" || baseUrl !== "";
+  const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
 
   return (
-    <div className="flex-1 px-4 py-6">
-      <div className="flex items-center justify-between mb-6 max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <div className="flex items-center gap-3">
-          {saveStatus === "saved" && (
-            <span className="text-sm text-green-400">Saved</span>
-          )}
-          {saveStatus === "error" && (
-            <span className="text-sm text-red-400 max-w-xs truncate">
-              {saveError}
-            </span>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!isDirty || saveStatus === "saving"}
-            className="rounded-md bg-white px-4 py-1.5 text-sm font-medium text-black transition hover:bg-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {saveStatus === "saving" ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
-
-      {loading && (
-        <p className="text-neutral-500">Loading settings...</p>
-      )}
-
-      {loadError && <p className="text-red-400">{loadError}</p>}
-
-      {settings && (
-        <div className="grid gap-4 sm:grid-cols-2 max-w-3xl">
-          {/* LLM */}
-          <div className="rounded-lg bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-lg font-semibold">LLM</h2>
-
-            <label className="block space-y-1">
-              <span className="text-sm text-neutral-500">Provider</span>
-              <select
-                value={provider}
-                onChange={(e) => handleProviderChange(e.target.value)}
-                className="block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-500"
-              >
-                {LLM_PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block space-y-1">
-              <span className="text-sm text-neutral-500">Model</span>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. gemini-2.5-flash"
-                className="block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-500"
-              />
-            </label>
-
-            <div className="space-y-1">
-              <span className="text-sm text-neutral-500">API Key</span>
-              <SecretInput
-                value={apiKey}
-                onChange={setApiKey}
-                hasExisting={isOriginalProvider && settings.llm.has_api_key}
-              />
-            </div>
-
-            {showBaseUrl && (
-              <label className="block space-y-1">
-                <span className="text-sm text-neutral-500">Base URL</span>
-                <input
-                  type="text"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="https://api.example.com/v1"
-                  className="block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-500"
-                />
-              </label>
-            )}
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Settings</h1>
+            <p className="app-page-copy">
+              Configure providers, backend details, and weather integrations for the
+              connected device.
+            </p>
           </div>
+        </div>
+      </section>
 
-          {/* Server */}
-          <div className="rounded-lg bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-lg font-semibold">Server</h2>
-
-            <label className="block space-y-1">
-              <span className="text-sm text-neutral-500">Display Name</span>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Penumbra"
-                className="block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-500"
-              />
-            </label>
-
-            <label className="block space-y-1">
-              <span className="text-sm text-neutral-500">System Prompt</span>
-              <textarea
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                rows={4}
-                className="block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-500 resize-y"
-              />
-            </label>
-
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-neutral-500">Port </span>
-                <span className="text-neutral-400">{settings.server.port}</span>
-                <span className="text-neutral-600 text-xs ml-2">
-                  (requires restart)
-                </span>
-              </div>
-              {settings.server.public_addr && (
-                <div>
-                  <span className="text-neutral-500">Public Address </span>
-                  <span className="text-neutral-400 font-mono text-xs">
-                    {settings.server.public_addr}
-                  </span>
-                  <span className="text-neutral-600 text-xs ml-2">
-                    (requires restart)
-                  </span>
-                </div>
+      <section className="app-page-content">
+        <div className="container app-flow" style={{ maxWidth: "56rem" }}>
+          <div className="app-button-row app-button-row--between">
+            <div className="app-inline-actions">
+              {saveStatus === "saving" && (
+                <span className="app-save-status app-save-status--saving">Saving…</span>
+              )}
+              {saveStatus === "saved" && (
+                <span className="app-save-status app-save-status--saved">Saved</span>
+              )}
+              {saveStatus === "error" && (
+                <span className="app-save-status app-save-status--error">{saveError}</span>
               )}
             </div>
+            <button
+              onClick={handleSave}
+              disabled={!isDirty || saveStatus === "saving"}
+              className="hero-cta app-button"
+            >
+              {saveStatus === "saving" ? "Saving..." : "Save changes"}
+            </button>
           </div>
 
-          {/* Weather */}
-          <div className="rounded-lg bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-lg font-semibold">Weather</h2>
-
-            <div className="space-y-1">
-              <span className="text-sm text-neutral-500">
-                PirateWeather API Key
-              </span>
-              <SecretInput
-                value={weatherKey}
-                onChange={setWeatherKey}
-                hasExisting={settings?.weather.has_api_key ?? false}
-              />
+          {loading && (
+            <div className="app-loading-state">
+              <p>Loading settings...</p>
             </div>
-          </div>
+          )}
 
-          {/* Storage (read-only) */}
-          <div className="rounded-lg bg-neutral-900 p-5 space-y-3">
-            <h2 className="text-lg font-semibold">
-              Storage{" "}
-              <span className="text-neutral-600 text-sm font-normal">
-                (read-only)
-              </span>
-            </h2>
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="text-neutral-500">Media Directory</dt>
-                <dd className="text-neutral-300 font-mono text-xs break-all">
-                  {settings.storage.media_dir}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Database Path</dt>
-                <dd className="text-neutral-300 font-mono text-xs break-all">
-                  {settings.storage.db_path}
-                </dd>
-              </div>
-            </dl>
-          </div>
+          {loadError && <p className="app-form-error">{loadError}</p>}
+
+          {settings && (
+            <div className="app-form-grid app-form-grid--two">
+              <section className="app-form-card">
+                <h2>LLM</h2>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Provider</span>
+                  <select
+                    value={provider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    className="app-form-select"
+                  >
+                    {LLM_PROVIDERS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Model</span>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="e.g. gemini-2.5-flash"
+                    className="app-form-input"
+                  />
+                </label>
+
+                <div className="app-form-field">
+                  <span className="app-form-label">API Key</span>
+                  <SecretInput
+                    value={apiKey}
+                    onChange={setApiKey}
+                    hasExisting={isOriginalProvider && settings.llm.has_api_key}
+                  />
+                </div>
+
+                {showBaseUrl && (
+                  <label className="app-form-field">
+                    <span className="app-form-label">Base URL</span>
+                    <input
+                      type="text"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder="https://api.example.com/v1"
+                      className="app-form-input"
+                    />
+                  </label>
+                )}
+              </section>
+
+              <section className="app-form-card">
+                <h2>Server</h2>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Display Name</span>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Penumbra"
+                    className="app-form-input"
+                  />
+                </label>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">System Prompt</span>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={4}
+                    className="app-form-textarea"
+                  />
+                </label>
+
+                <div className="app-kv app-kv--compact">
+                  <div className="app-kv-item">
+                    <dt>Port</dt>
+                    <dd className="app-value">
+                      {settings.server.port}
+                      <span className="app-readonly-note"> (requires restart)</span>
+                    </dd>
+                  </div>
+                  {settings.server.public_addr && (
+                    <div className="app-kv-item">
+                      <dt>Public Address</dt>
+                      <dd className="app-mono">
+                        {settings.server.public_addr}
+                        <span className="app-readonly-note"> (requires restart)</span>
+                      </dd>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="app-form-card">
+                <h2>Weather</h2>
+
+                <div className="app-form-field">
+                  <span className="app-form-label">PirateWeather API Key</span>
+                  <SecretInput
+                    value={weatherKey}
+                    onChange={setWeatherKey}
+                    hasExisting={settings.weather.has_api_key}
+                  />
+                </div>
+              </section>
+
+              <section className="app-form-card">
+                <h2>
+                  Storage <span className="app-readonly-note">(read-only)</span>
+                </h2>
+                <dl className="app-kv">
+                  <div className="app-kv-item">
+                    <dt>Media Directory</dt>
+                    <dd className="app-mono">{settings.storage.media_dir}</dd>
+                  </div>
+                  <div className="app-kv-item">
+                    <dt>Database Path</dt>
+                    <dd className="app-mono">{settings.storage.db_path}</dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </section>
+    </>
   );
 }

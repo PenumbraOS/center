@@ -47,13 +47,15 @@ function normalizeServerUrl(value: string): string {
 function levelClasses(level: InstallLogEntry["level"]) {
   switch (level) {
     case "success":
-      return "text-green-400";
+      return "app-tone-success";
     case "warning":
-      return "text-yellow-400";
+      return "app-tone-warning";
     case "error":
-      return "text-red-400";
+      return "app-tone-danger";
+    case "info":
+      return "app-tone-info";
     default:
-      return "text-neutral-300";
+      return "app-tone-default";
   }
 }
 
@@ -853,304 +855,291 @@ export default function InstallPage() {
     (statusSummary?.injectorInstalled ?? false);
 
   return (
-    <div className="flex flex-1 justify-center px-4 py-10">
-      <div className="w-full max-w-4xl space-y-8">
-        <div>
-          <Link
-            to="/"
-            className="mb-6 inline-flex text-sm text-neutral-500 transition-colors hover:text-neutral-300"
-          >
-            ← Back to setup options
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <Link to="/" className="back-link">
+            <span aria-hidden="true">←</span>
+            <span>Back to setup options</span>
           </Link>
-          <h1 className="text-4xl font-semibold tracking-tight">
-            Install to device over USB
-          </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-neutral-400">
-            Connect a USB-debuggable device, install the hook stack, and then
-            connect this portal to your server.
-          </p>
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Install to device over USB</h1>
+            <p className="app-page-copy">
+              Connect a USB-debuggable device, install the hook stack, and then connect
+              this portal to your server.
+            </p>
+          </div>
         </div>
+      </section>
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 space-y-5">
-          {wizardStep === "overview" && (
-            <>
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold">Before you begin</h2>
-                <p className="text-sm leading-6 text-neutral-400">
-                  Connect a USB-debuggable device, start the installer, and then finish
-                  by connecting this portal to your server.
-                </p>
-              </div>
-
-              <ul className="space-y-2 text-sm text-neutral-300">
-                <li>• USB debugging must already be enabled on the device.</li>
-                <li>• Keep the device connected until the installer finishes.</li>
-                <li>• The device may disconnect briefly while components are applied.</li>
-              </ul>
-
-              {!support.supported && (
-                <div className="rounded-xl border border-red-900 bg-red-950/30 p-4 space-y-2 text-sm text-red-100">
-                  <div className="font-medium">This browser does not support the installer.</div>
-                  <ul className="space-y-1 text-red-200">
-                    {support.reasons.map((reason) => (
-                      <li key={reason}>• {reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep("device")}
-                  disabled={!canContinueFromOverview}
-                  className="rounded-lg bg-neutral-100 px-5 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Continue
-                </button>
-              </div>
-            </>
-          )}
-
-          {wizardStep === "device" && (
-            <>
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold">Connect your device</h2>
-                <p className="text-sm leading-6 text-neutral-400">
-                  Grant USB access so the installer can inspect the device and confirm
-                  that it is ready before you begin installation.
-                </p>
-              </div>
-
-              {!support.supported && (
-                <div className="rounded-xl border border-red-900 bg-red-950/30 p-4 space-y-2 text-sm text-red-100">
-                  <div className="font-medium">This browser does not support the installer.</div>
-                  <ul className="space-y-1 text-red-200">
-                    {support.reasons.map((reason) => (
-                      <li key={reason}>• {reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-neutral-100">
-                      Device connection
-                    </div>
-                    <div className="text-sm text-neutral-400">
-                      {connectedDevice
-                        ? `Connected to ${connectedDevice.name}`
-                        : "No device connected yet"}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleConnectDevice}
-                    disabled={isBusy || !support.supported}
-                    className="rounded-lg bg-neutral-100 px-4 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isBusy && stage === "usb-connect"
-                      ? "Connecting..."
-                      : connectedDevice
-                        ? "Reconnect device"
-                        : "Connect device"}
-                  </button>
-                </div>
-
-                {connectedDevice && (
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm">
-                    <div className="font-medium text-neutral-100">{connectedDevice.name}</div>
-                    <div className="mt-1 text-neutral-400">{deviceStatusSummary}</div>
-                    {deviceSummary?.model && (
-                      <div className="mt-2 text-neutral-500">Model: {deviceSummary.model}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep("overview")}
-                  disabled={isBusy}
-                  className="rounded-lg border border-neutral-700 px-4 py-3 font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWizardStep("install")}
-                  disabled={!canContinueFromDevice}
-                  className="rounded-lg bg-neutral-100 px-5 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Continue to install
-                </button>
-              </div>
-            </>
-          )}
-
-          {wizardStep === "install" && (
-            <>
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold">Install to device</h2>
-                <p className="text-sm leading-6 text-neutral-400">
-                  Start the installer when you are ready. The device may disconnect and
-                  reconnect while components are applied.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-neutral-100">Current status</div>
-                    <div className="text-sm text-neutral-400">{installerStatusLabel}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleInstallHookStack}
-                    disabled={!canStartInstall}
-                    className="rounded-lg bg-neutral-100 px-5 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isBusy ? "Installing..." : "Start install"}
-                  </button>
-                </div>
-
-                {hasInstalledHookStack && !isBusy && (
-                  <div className="rounded-lg border border-green-900 bg-green-950/30 px-4 py-3 text-sm text-green-100">
-                    Install complete. Continue to the final step to connect the portal to
-                    your server.
-                  </div>
-                )}
-
-                <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm">
-                  <div className="text-neutral-500">Latest activity</div>
-                  <div
-                    className={`mt-1 ${recentLogs.at(-1) ? levelClasses(recentLogs.at(-1)!.level) : "text-neutral-400"}`}
-                  >
-                    {recentLogSummary}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep("device")}
-                  disabled={isBusy}
-                  className="rounded-lg border border-neutral-700 px-4 py-3 font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWizardStep("finish")}
-                  disabled={!hasInstalledHookStack || isBusy}
-                  className="rounded-lg bg-neutral-100 px-5 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Continue to finish
-                </button>
-              </div>
-            </>
-          )}
-
-          {wizardStep === "finish" && (
-            <>
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold">Finish setup</h2>
-                <p className="text-sm leading-6 text-neutral-400">
-                  Connect this portal to your server to complete the guided flow.
-                </p>
-              </div>
-
-              <div className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-                <div className="rounded-lg border border-green-900 bg-green-950/30 px-4 py-3 text-sm text-green-100">
-                  The hook stack is installed. Enter the server you want this portal to
-                  connect to.
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-neutral-200">
-                    Remote server
-                  </label>
-                  <input
-                    type="text"
-                    value={remoteServer}
-                    onChange={(e) => setRemoteServer(e.target.value)}
-                    placeholder="pin.example.com or https://pin.example.com"
-                    disabled={isBusy}
-                    className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-3 text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500 disabled:opacity-50"
-                  />
-                  <p className="mt-2 text-sm text-neutral-400">
-                    This is used for the final portal connection handoff.
+      <section className="app-page-content">
+        <div className="container app-flow" style={{ maxWidth: "64rem" }}>
+          <section className="app-panel app-flow">
+            {wizardStep === "overview" && (
+              <>
+                <div className="app-flow app-flow--sm">
+                  <h2 className="app-section-heading">Before you begin</h2>
+                  <p className="app-section-copy">
+                    Connect a USB-debuggable device, start the installer, and then finish
+                    by connecting this portal to your server.
                   </p>
                 </div>
-                <div className="flex items-center justify-between gap-3">
+
+                <ul className="app-list">
+                  <li>USB debugging must already be enabled on the device.</li>
+                  <li>Keep the device connected until the installer finishes.</li>
+                  <li>The device may disconnect briefly while components are applied.</li>
+                </ul>
+
+                {!support.supported && (
+                  <div className="app-notice app-notice--danger app-flow app-flow--sm">
+                    <div className="app-panel-title">This browser does not support the installer.</div>
+                    <ul className="app-list">
+                      {support.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="app-button-row app-button-row--between">
+                  <div />
                   <button
                     type="button"
-                    onClick={() => setWizardStep("install")}
+                    onClick={() => setWizardStep("device")}
+                    disabled={!canContinueFromOverview}
+                    className="hero-cta app-button"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            )}
+
+            {wizardStep === "device" && (
+              <>
+                <div className="app-flow app-flow--sm">
+                  <h2 className="app-section-heading">Connect your device</h2>
+                  <p className="app-section-copy">
+                    Grant USB access so the installer can inspect the device and confirm
+                    that it is ready before you begin installation.
+                  </p>
+                </div>
+
+                {!support.supported && (
+                  <div className="app-notice app-notice--danger app-flow app-flow--sm">
+                    <div className="app-panel-title">This browser does not support the installer.</div>
+                    <ul className="app-list">
+                      {support.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="app-subpanel app-flow">
+                  <div className="app-button-row app-button-row--between">
+                    <div className="app-flow app-flow--sm">
+                      <div className="app-text-label">Device connection</div>
+                      <div className="app-muted">
+                        {connectedDevice
+                          ? `Connected to ${connectedDevice.name}`
+                          : "No device connected yet"}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConnectDevice}
+                      disabled={isBusy || !support.supported}
+                      className="hero-cta app-button"
+                    >
+                      {isBusy && stage === "usb-connect"
+                        ? "Connecting..."
+                        : connectedDevice
+                          ? "Reconnect device"
+                          : "Connect device"}
+                    </button>
+                  </div>
+
+                  {connectedDevice && (
+                    <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                      <div className="app-panel-title">{connectedDevice.name}</div>
+                      <div className="app-muted">{deviceStatusSummary}</div>
+                      {deviceSummary?.model && (
+                        <div className="app-muted">Model: {deviceSummary.model}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="app-button-row app-button-row--between">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep("overview")}
                     disabled={isBusy}
-                    className="rounded-lg border border-neutral-700 px-4 py-3 font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="hero-cta hero-cta--secondary app-button"
                   >
                     Back
                   </button>
                   <button
                     type="button"
-                    onClick={handleConnectServer}
-                    disabled={!canFinishInstall}
-                    className="rounded-lg bg-neutral-100 px-5 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => setWizardStep("install")}
+                    disabled={!canContinueFromDevice}
+                    className="hero-cta app-button"
                   >
-                    {isBusy && stage === "connect-server"
-                      ? "Connecting..."
-                      : "Connect portal to server"}
+                    Continue to install
                   </button>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
-        </section>
+            {wizardStep === "install" && (
+              <>
+                <div className="app-flow app-flow--sm">
+                  <h2 className="app-section-heading">Install to device</h2>
+                  <p className="app-section-copy">
+                    Start the installer when you are ready. The device may disconnect and
+                    reconnect while components are applied.
+                  </p>
+                </div>
 
-        <section className="space-y-4">
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+                <div className="app-subpanel app-flow">
+                  <div className="app-button-row app-button-row--between">
+                    <div className="app-flow app-flow--sm">
+                      <div className="app-text-label">Current status</div>
+                      <div className="app-muted">{installerStatusLabel}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleInstallHookStack}
+                      disabled={!canStartInstall}
+                      className="hero-cta app-button"
+                    >
+                      {isBusy ? "Installing..." : "Start install"}
+                    </button>
+                  </div>
+
+                  {hasInstalledHookStack && !isBusy && (
+                    <div className="app-notice app-notice--success">
+                      Install complete. Continue to the final step to connect the portal to
+                      your server.
+                    </div>
+                  )}
+
+                  <div className="app-status-card app-status-card--dense app-flow app-flow--sm">
+                    <div className="app-text-label">Latest activity</div>
+                    <div className={recentLogs.at(-1) ? levelClasses(recentLogs.at(-1)!.level) : "app-tone-default"}>
+                      {recentLogSummary}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="app-button-row app-button-row--between">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep("device")}
+                    disabled={isBusy}
+                    className="hero-cta hero-cta--secondary app-button"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep("finish")}
+                    disabled={!hasInstalledHookStack || isBusy}
+                    className="hero-cta app-button"
+                  >
+                    Continue to finish
+                  </button>
+                </div>
+              </>
+            )}
+
+            {wizardStep === "finish" && (
+              <>
+                <div className="app-flow app-flow--sm">
+                  <h2 className="app-section-heading">Finish setup</h2>
+                  <p className="app-section-copy">
+                    Connect this portal to your server to complete the guided flow.
+                  </p>
+                </div>
+
+                <div className="app-subpanel app-flow">
+                  <div className="app-notice app-notice--success">
+                    The hook stack is installed. Enter the server you want this portal to
+                    connect to.
+                  </div>
+                  <label className="app-form-field">
+                    <span className="app-form-label">Remote server</span>
+                    <input
+                      type="text"
+                      value={remoteServer}
+                      onChange={(e) => setRemoteServer(e.target.value)}
+                      placeholder="pin.example.com or https://pin.example.com"
+                      disabled={isBusy}
+                      className="app-form-input"
+                    />
+                    <span className="app-form-help">
+                      This is used for the final portal connection handoff.
+                    </span>
+                  </label>
+                  <div className="app-button-row app-button-row--between">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep("install")}
+                      disabled={isBusy}
+                      className="hero-cta hero-cta--secondary app-button"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConnectServer}
+                      disabled={!canFinishInstall}
+                      className="hero-cta app-button"
+                    >
+                      {isBusy && stage === "connect-server"
+                        ? "Connecting..."
+                        : "Connect portal to server"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {error && <p className="app-form-error">{error}</p>}
+          </section>
+
+          <section className="app-log-panel">
             <button
               type="button"
               onClick={() => setShowTroubleshooting((prev) => !prev)}
-              className="flex w-full items-center justify-between gap-3 text-left"
+              className="app-toggle-header"
             >
-              <div>
-                <h2 className="text-lg font-semibold">Troubleshooting</h2>
-                <p className="text-sm text-neutral-400">
+              <div className="app-flow app-flow--sm">
+                <h2 className="app-panel-title">Troubleshooting</h2>
+                <p className="app-panel-copy">
                   Save the annotated device logcat or inspect the detailed installer log.
                 </p>
               </div>
-              <span className="text-sm text-neutral-500">
-                {showTroubleshooting ? "Hide" : "Show"}
-              </span>
+              <span className="app-muted">{showTroubleshooting ? "Hide" : "Show"}</span>
             </button>
 
             {showTroubleshooting && (
-              <div className="mt-5 space-y-4">
+              <div className="app-flow">
                 {hasAnyRecoveryTargets && !isBusy && (
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm text-neutral-300">
+                  <div className="app-notice app-notice--info">
                     Need to remove the installed components? Use the dedicated recovery
-                    flow.
-                    <Link
-                      to="/recovery"
-                      className="ml-2 font-medium text-neutral-100 underline underline-offset-4 transition-colors hover:text-white"
-                    >
-                      Open recovery
-                    </Link>
+                    flow. <Link to="/recovery" className="app-text-link">Open recovery</Link>
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
+                <div className="app-toolbar">
                   <button
                     type="button"
                     onClick={handleCopyInstallerLog}
                     disabled={logs.length === 0}
-                    className="rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="app-button app-button--ghost app-button--small"
                   >
                     Copy installer log
                   </button>
@@ -1158,7 +1147,7 @@ export default function InstallPage() {
                     type="button"
                     onClick={handleSaveAnnotatedLogcat}
                     disabled={!hasAnnotatedLogcat}
-                    className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-medium text-blue-200 transition-colors hover:border-blue-700 hover:bg-blue-950/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="download-btn app-button app-button--small"
                   >
                     Save device logcat
                   </button>
@@ -1166,7 +1155,7 @@ export default function InstallPage() {
                     <button
                       type="button"
                       onClick={jumpInstallerLogToLatest}
-                      className="rounded-lg border border-blue-700 px-3 py-2 text-xs font-medium text-blue-300 transition-colors hover:border-blue-500 hover:bg-blue-950/40"
+                      className="app-button app-button--ghost app-button--small"
                     >
                       Jump to latest
                     </button>
@@ -1174,27 +1163,22 @@ export default function InstallPage() {
                 </div>
 
                 {logs.length === 0 ? (
-                  <p className="text-sm text-neutral-500">No installer activity yet.</p>
+                  <p className="app-log-empty">No installer activity yet.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="app-flow app-flow--sm">
                     {showInstallerLogJumpButton && (
-                      <div className="text-xs text-blue-300">
+                      <div className="app-tone-info">
                         New installer log entries are available below.
                       </div>
                     )}
                     <div
                       ref={installerLogContainerRef}
                       onScroll={handleInstallerLogScroll}
-                      className="max-h-[28rem] space-y-3 overflow-auto pr-2"
+                      className="app-log-list app-log-scroll"
                     >
                       {logs.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="rounded-lg bg-neutral-950 px-4 py-3 text-sm"
-                        >
-                          <div className="mb-1 text-xs text-neutral-500">
-                            {entry.timestamp}
-                          </div>
+                        <div key={entry.id} className="app-log-entry">
+                          <div className="app-log-entry__time">{entry.timestamp}</div>
                           <div className={levelClasses(entry.level)}>{entry.message}</div>
                         </div>
                       ))}
@@ -1203,9 +1187,9 @@ export default function InstallPage() {
                 )}
               </div>
             )}
-          </div>
-        </section>
-      </div>
-    </div>
+          </section>
+        </div>
+      </section>
+    </>
   );
 }

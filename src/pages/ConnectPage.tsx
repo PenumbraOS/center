@@ -43,51 +43,61 @@ export default function ConnectPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link
-          to="/"
-          className="mb-6 inline-flex text-sm text-neutral-500 transition-colors hover:text-neutral-300"
-        >
-          ← Back to setup options
-        </Link>
-
-        <h1 className="mb-2 text-3xl font-semibold tracking-tight">
-          Connect to existing server
-        </h1>
-        <p className="mb-8 text-neutral-400">
-          Enter your remote Pin server address to connect the portal.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="https://pin.example.com or 192.168.1.125:9090"
-              disabled={isConnecting}
-              className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-3 text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500 disabled:opacity-50"
-            />
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <Link to="/" className="back-link">
+            <span aria-hidden="true">←</span>
+            <span>Back to setup options</span>
+          </Link>
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Connect to existing server</h1>
+            <p className="app-page-copy">
+              Enter your remote Pin server address to connect the portal.
+            </p>
           </div>
+        </div>
+      </section>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+      <section className="app-page-content">
+        <div className="container">
+          <div className="app-card-grid" style={{ maxWidth: "36rem" }}>
+            <form onSubmit={handleSubmit} className="app-form-card">
+              <label className="app-form-field">
+                <span className="app-form-label">Server address</span>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="https://pin.example.com or 192.168.1.125:9090"
+                  disabled={isConnecting}
+                  className="app-form-input"
+                />
+              </label>
 
-          <button
-            type="submit"
-            disabled={isConnecting || !address.trim()}
-            className="w-full rounded-lg bg-neutral-100 px-4 py-3 font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isConnecting ? "Connecting..." : "Connect"}
-          </button>
-        </form>
+              {error && <p className="app-form-error">{error}</p>}
 
-        <p className="mt-6 text-xs leading-relaxed text-neutral-500">
-          Your browser may ask for permission to access your local network if you
-          connect to a LAN-hosted server. This is required for the portal to
-          communicate with your Pin server.
-        </p>
-      </div>
-    </div>
+              <div className="app-button-row">
+                <button
+                  type="submit"
+                  disabled={isConnecting || !address.trim()}
+                  className="hero-cta app-button app-button--wide"
+                >
+                  {isConnecting ? "Connecting..." : "Connect"}
+                </button>
+              </div>
+            </form>
+
+            <div className="callout app-flow app-flow--sm">
+              <p>
+                Your browser may ask for permission to access your local network if you
+                connect to a LAN-hosted server. This is required for the portal to
+                communicate with your Pin server.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

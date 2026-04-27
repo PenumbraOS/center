@@ -23,25 +23,13 @@ function memoryTypeLabel(type: string): string {
 function statusBadge(status: string) {
   switch (status) {
     case "complete":
-      return null; // Don't show badge for complete
+      return null;
     case "pending":
-      return (
-        <span className="absolute top-2 right-2 rounded-full bg-yellow-500/80 px-2 py-0.5 text-xs font-medium text-black">
-          Pending
-        </span>
-      );
+      return <span className="app-status-badge app-status-badge--warning">Pending</span>;
     case "uploading":
-      return (
-        <span className="absolute top-2 right-2 rounded-full bg-blue-500/80 px-2 py-0.5 text-xs font-medium text-white">
-          Uploading
-        </span>
-      );
+      return <span className="app-status-badge app-status-badge--info">Uploading</span>;
     case "failed":
-      return (
-        <span className="absolute top-2 right-2 rounded-full bg-red-500/80 px-2 py-0.5 text-xs font-medium text-white">
-          Failed
-        </span>
-      );
+      return <span className="app-status-badge app-status-badge--danger">Failed</span>;
     default:
       return null;
   }
@@ -55,45 +43,33 @@ function MemoryCard({
   thumbnailUrl: string | null;
 }) {
   return (
-    <Link
-      to={`/gallery/${memory.uuid}`}
-      className="group relative block overflow-hidden rounded-lg bg-neutral-800 transition-transform hover:scale-[1.02]"
-    >
-      <div className="aspect-square">
+    <Link to={`/gallery/${memory.uuid}`} className="gallery-card app-gallery-link">
+      {statusBadge(memory.status)}
+
+      <div className="gallery-card-img">
         {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt={`${memory.memory_type} memory`}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
+          <img src={thumbnailUrl} alt={`${memory.memory_type} memory`} loading="lazy" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-neutral-500">
-            <span className="text-3xl">
+          <div className="app-gallery-placeholder">
+            <span aria-hidden="true">
               {memory.memory_type === "video"
-                ? "\u25B6"
+                ? "▶"
                 : memory.memory_type === "note"
-                  ? "\u270E"
+                  ? "✎"
                   : memory.memory_type === "food_log"
-                    ? "\u2615"
-                    : "\u25A3"}
+                    ? "☕"
+                    : "▣"}
             </span>
           </div>
         )}
       </div>
 
-      {statusBadge(memory.status)}
-
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6">
-        <span className="text-xs font-medium text-neutral-300">
-          {memoryTypeLabel(memory.memory_type)}
-        </span>
+      <span className="gallery-caption">
+        <span className="app-gallery-caption-title">{memoryTypeLabel(memory.memory_type)}</span>
         {memory.location?.human_readable && (
-          <p className="truncate text-xs text-neutral-400">
-            {memory.location.human_readable}
-          </p>
+          <span className="app-gallery-caption-meta">{memory.location.human_readable}</span>
         )}
-      </div>
+      </span>
     </Link>
   );
 }
@@ -113,61 +89,69 @@ export default function GalleryPage() {
   const filters: FilterType[] = ["all", "photo", "video", "note", "food_log"];
 
   return (
-    <div className="flex-1 px-4 py-6">
-      {/* Filter bar */}
-      <div className="mb-6 flex items-center gap-2 overflow-x-auto">
-        {filters.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              filter === f
-                ? "bg-neutral-100 text-neutral-900"
-                : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
-            }`}
-          >
-            {f === "all" ? "All" : memoryTypeLabel(f)}
-          </button>
-        ))}
-
-        <span className="ml-auto text-sm text-neutral-500">
-          {filtered.length} {filtered.length === 1 ? "memory" : "memories"}
-        </span>
-      </div>
-
-      {/* Loading state */}
-      {!memoriesLoaded && (
-        <div className="flex items-center justify-center py-20">
-          <p className="text-neutral-500">Loading memories...</p>
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Gallery</h1>
+            <p className="app-page-copy">
+              Browse memories synced from your Pin and inspect their upload status,
+              thumbnails, and metadata.
+            </p>
+          </div>
         </div>
-      )}
+      </section>
 
-      {/* Empty state */}
-      {memoriesLoaded && filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20">
-          <p className="text-lg text-neutral-500">No memories yet</p>
-          <p className="mt-1 text-sm text-neutral-600">
-            Take a photo or video with your Pin to see it here.
-          </p>
-        </div>
-      )}
+      <section className="app-page-content gallery">
+        <div className="container">
+          <div className="app-gallery-toolbar">
+            <div className="app-filter-row" role="tablist" aria-label="Memory type filters">
+              {filters.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`app-filter-chip${filter === f ? " active" : ""}`}
+                >
+                  {f === "all" ? "All" : memoryTypeLabel(f)}
+                </button>
+              ))}
+            </div>
 
-      {/* Grid */}
-      {memoriesLoaded && filtered.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {filtered.map((memory) => (
-            <MemoryCard
-              key={memory.uuid}
-              memory={memory}
-              thumbnailUrl={
-                memory.thumbnail_count > 0 && client
-                  ? client.thumbnailUrl(memory.uuid, 0)
-                  : null
-              }
-            />
-          ))}
+            <span className="app-count-label">
+              {filtered.length} {filtered.length === 1 ? "memory" : "memories"}
+            </span>
+          </div>
+
+          {!memoriesLoaded && (
+            <div className="app-loading-state">
+              <p>Loading memories...</p>
+            </div>
+          )}
+
+          {memoriesLoaded && filtered.length === 0 && (
+            <div className="app-empty-state">
+              <p className="app-empty-state__title">No memories yet</p>
+              <p>Take a photo or video with your Pin to see it here.</p>
+            </div>
+          )}
+
+          {memoriesLoaded && filtered.length > 0 && (
+            <div className="gallery-grid gallery-grid--square">
+              {filtered.map((memory) => (
+                <MemoryCard
+                  key={memory.uuid}
+                  memory={memory}
+                  thumbnailUrl={
+                    memory.thumbnail_count > 0 && client
+                      ? client.thumbnailUrl(memory.uuid, 0)
+                      : null
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </section>
+    </>
   );
 }

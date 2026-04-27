@@ -16,112 +16,114 @@ export default function DevicePage() {
   };
 
   return (
-    <div className="flex-1 px-4 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight mb-6">Device</h1>
-
-      <div className="grid gap-4 sm:grid-cols-2 max-w-3xl">
-        {/* Device Info */}
-        <div className="rounded-lg bg-neutral-900 p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Info</h2>
-          <dl className="space-y-2 text-sm">
-            <div>
-              <dt className="text-neutral-500">Display Name</dt>
-              <dd className="text-neutral-200">
-                {device?.display_name ?? "Unknown"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Server Address</dt>
-              <dd className="text-neutral-300 font-mono text-xs">
-                {baseUrl ?? "Not connected"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Server Port</dt>
-              <dd className="text-neutral-200">{device?.server_port}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">LLM Provider</dt>
-              <dd className="text-neutral-200">{device?.llm_provider}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">LLM Model</dt>
-              <dd className="text-neutral-200">{device?.llm_model}</dd>
-            </div>
-          </dl>
+    <>
+      <section className="app-page-header">
+        <div className="container">
+          <div className="app-page-intro">
+            <h1 className="app-page-title">Device</h1>
+            <p className="app-page-copy">
+              Review server details, memory counts, and recovery actions for the
+              currently connected Pin.
+            </p>
+          </div>
         </div>
+      </section>
 
-        {/* Memory Stats */}
-        <div className="rounded-lg bg-neutral-900 p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Memory Stats</h2>
-          <dl className="space-y-2 text-sm">
-            <div>
-              <dt className="text-neutral-500">Total Memories</dt>
-              <dd className="text-neutral-200">{memoryStats.total}</dd>
-            </div>
-            <div className="flex gap-4">
-              <div>
-                <dt className="text-neutral-500">Photos</dt>
-                <dd className="text-neutral-200">{memoryStats.photos}</dd>
+      <section className="app-page-content">
+        <div className="container app-form-grid app-form-grid--two" style={{ maxWidth: "56rem" }}>
+          <section className="app-info-card app-flow app-flow--sm">
+            <h2 className="app-panel-title">Info</h2>
+            <dl className="app-kv">
+              <div className="app-kv-item">
+                <dt>Display Name</dt>
+                <dd className="app-value">{device?.display_name ?? "Unknown"}</dd>
               </div>
-              <div>
-                <dt className="text-neutral-500">Videos</dt>
-                <dd className="text-neutral-200">{memoryStats.videos}</dd>
+              <div className="app-kv-item">
+                <dt>Server Address</dt>
+                <dd className="app-mono">{baseUrl ?? "Not connected"}</dd>
               </div>
-              <div>
-                <dt className="text-neutral-500">Notes</dt>
-                <dd className="text-neutral-200">{memoryStats.notes}</dd>
+              <div className="app-kv-item">
+                <dt>Server Port</dt>
+                <dd className="app-value">{device?.server_port}</dd>
               </div>
-              <div>
-                <dt className="text-neutral-500">Food</dt>
-                <dd className="text-neutral-200">{memoryStats.foodLogs}</dd>
+              <div className="app-kv-item">
+                <dt>LLM Provider</dt>
+                <dd className="app-value">{device?.llm_provider}</dd>
               </div>
-            </div>
-            <div className="flex gap-4">
-              <div>
-                <dt className="text-neutral-500">Complete</dt>
-                <dd className="text-green-400">{memoryStats.complete}</dd>
+              <div className="app-kv-item">
+                <dt>LLM Model</dt>
+                <dd className="app-value">{device?.llm_model}</dd>
               </div>
-              <div>
-                <dt className="text-neutral-500">Pending</dt>
-                <dd className="text-yellow-400">{memoryStats.pending}</dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Failed</dt>
-                <dd className="text-red-400">{memoryStats.failed}</dd>
-              </div>
-            </div>
-          </dl>
-        </div>
+            </dl>
+          </section>
 
-        {/* Recovery */}
-        <div className="sm:col-span-2 rounded-lg border border-neutral-800 bg-neutral-900 p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Recovery</h2>
-          <p className="text-sm text-neutral-400">
-            Need to remove the installed hook stack or reboot after a recovery action?
-          </p>
-          <Link
-            to="/recovery"
-            className="inline-flex rounded-lg border border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800"
-          >
-            Open recovery
-          </Link>
-        </div>
+          <section className="app-info-card app-flow app-flow--sm">
+            <h2 className="app-panel-title">Memory Stats</h2>
+            <dl className="app-kv">
+              <div className="app-kv-item">
+                <dt>Total Memories</dt>
+                <dd className="app-value">{memoryStats.total}</dd>
+              </div>
+              <div className="app-stat-grid app-stat-grid--two">
+                <div className="app-kv-item">
+                  <dt>Photos</dt>
+                  <dd className="app-value">{memoryStats.photos}</dd>
+                </div>
+                <div className="app-kv-item">
+                  <dt>Videos</dt>
+                  <dd className="app-value">{memoryStats.videos}</dd>
+                </div>
+                <div className="app-kv-item">
+                  <dt>Notes</dt>
+                  <dd className="app-value">{memoryStats.notes}</dd>
+                </div>
+                <div className="app-kv-item">
+                  <dt>Food</dt>
+                  <dd className="app-value">{memoryStats.foodLogs}</dd>
+                </div>
+              </div>
+              <div className="app-stat-grid app-stat-grid--two">
+                <div className="app-kv-item">
+                  <dt>Complete</dt>
+                  <dd className="app-tone-success">{memoryStats.complete}</dd>
+                </div>
+                <div className="app-kv-item">
+                  <dt>Pending</dt>
+                  <dd className="app-tone-warning">{memoryStats.pending}</dd>
+                </div>
+                <div className="app-kv-item">
+                  <dt>Failed</dt>
+                  <dd className="app-tone-danger">{memoryStats.failed}</dd>
+                </div>
+              </div>
+            </dl>
+          </section>
 
-        {/* Connection */}
-        <div className="sm:col-span-2 rounded-lg border border-neutral-800 bg-neutral-900 p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Connection</h2>
-          <p className="text-sm text-neutral-400">
-            Disconnect from this Pin server to connect to a different one.
-          </p>
-          <button
-            onClick={disconnect}
-            className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-700"
-          >
-            Disconnect
-          </button>
+          <section className="app-info-card app-flow app-flow--sm" style={{ gridColumn: "1 / -1" }}>
+            <h2 className="app-panel-title">Recovery</h2>
+            <p className="app-panel-copy">
+              Need to remove the installed hook stack or reboot after a recovery action?
+            </p>
+            <div className="app-inline-actions">
+              <Link to="/recovery" className="hero-cta hero-cta--secondary app-button">
+                Open recovery
+              </Link>
+            </div>
+          </section>
+
+          <section className="app-info-card app-flow app-flow--sm" style={{ gridColumn: "1 / -1" }}>
+            <h2 className="app-panel-title">Connection</h2>
+            <p className="app-panel-copy">
+              Disconnect from this Pin server to connect to a different one.
+            </p>
+            <div className="app-inline-actions">
+              <button onClick={disconnect} className="app-button app-button--ghost">
+                Disconnect
+              </button>
+            </div>
+          </section>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
