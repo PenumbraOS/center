@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { usePin } from "../hooks";
 
 export default function DevicePage() {
@@ -91,6 +92,20 @@ export default function DevicePage() {
               </div>
             </div>
           </dl>
+        </div>
+
+        {/* Recovery */}
+        <div className="sm:col-span-2 rounded-lg border border-neutral-800 bg-neutral-900 p-5 space-y-3">
+          <h2 className="text-lg font-semibold">Recovery</h2>
+          <p className="text-sm text-neutral-400">
+            Need to remove the installed hook stack or reboot after a recovery action?
+          </p>
+          <Link
+            to="/recovery"
+            className="inline-flex rounded-lg border border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800"
+          >
+            Open recovery
+          </Link>
         </div>
 
         {/* Connection */}

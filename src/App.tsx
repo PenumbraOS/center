@@ -8,6 +8,7 @@ import GalleryPage from "./pages/GalleryPage";
 import MemoryDetailPage from "./pages/MemoryDetailPage";
 import DevicePage from "./pages/DevicePage";
 import SettingsPage from "./pages/SettingsPage";
+import RecoveryPage from "./pages/RecoveryPage";
 
 function RootRedirect() {
   const { status } = usePin();
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/connect" element={<ConnectPage />} />
             <Route path="/install" element={<InstallPage />} />
+            <Route path="/recovery" element={<RecoveryPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/gallery/:uuid" element={<MemoryDetailPage />} />
             <Route path="/device" element={<DevicePage />} />
