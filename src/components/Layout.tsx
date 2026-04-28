@@ -54,7 +54,7 @@ function ConnectingOverlay() {
   );
 }
 
-const PUBLIC_ROUTES = new Set(["/", "/connect", "/install"]);
+const PUBLIC_ROUTES = new Set(["/", "/connect"]);
 
 export default function Layout() {
   const { status, device } = usePin();

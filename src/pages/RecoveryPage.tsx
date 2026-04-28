@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import {
   EXPLOIT_PACKAGE,
   HOOK_PACKAGE,
@@ -200,10 +199,10 @@ export default function RecoveryPage() {
     <>
       <section className="app-page-header">
         <div className="container">
-          <Link to="/install" className="back-link">
+          <a href="/install/" className="back-link">
             <span aria-hidden="true">←</span>
             <span>Back to installer</span>
-          </Link>
+          </a>
           <div className="app-page-intro">
             <h1 className="app-page-title">Recovery</h1>
             <p className="app-page-copy">

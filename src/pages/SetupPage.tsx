@@ -62,9 +62,9 @@ export default function SetupPage() {
               </ul>
 
               <div className="app-inline-actions">
-                <Link to="/install" className="hero-cta hero-cta--secondary app-button">
+                <a href="/install/" className="hero-cta hero-cta--secondary app-button">
                   Open installer
-                </Link>
+                </a>
               </div>
             </section>
           </div>

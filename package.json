@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:install": "tsc -b && vite build --config vite.install.config.ts",
+    "build:center": "tsc -b && vite build --config vite.center.config.ts",
+    "build:hugo-static": "tsc -b && node ./scripts/build-hugo-static.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

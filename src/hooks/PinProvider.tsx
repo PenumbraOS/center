@@ -1,79 +1,25 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { PinClient } from "../api";
 import type { DeviceInfo, MemoryRecord, StreamEvent } from "../api";
-import { logDebug, logError, logInfo, logWarn } from "../logging";
+import { logDebug, logError, logInfo } from "../logging";
+import { PinContext, type PinContextValue } from "./pinContext";
+import {
+  loadInitialConnectionState,
+  loadSavedUrl,
+  saveUrl,
+  type ConnectionStatus,
+} from "./pinStorage";
 import { useEventStream } from "./useEventStream";
 
-type ConnectionStatus = "disconnected" | "connecting" | "connected";
-
-interface PinContextValue {
-  /** Current connection status. */
-  status: ConnectionStatus;
-  /** The PinClient instance, or null if not connected. */
-  client: PinClient | null;
-  /** Device info from the server. */
-  device: DeviceInfo | null;
-  /** All memories, kept live via the event stream. */
-  memories: MemoryRecord[];
-  /** Whether the initial memory list has been loaded. */
-  memoriesLoaded: boolean;
-  /** Connect to a Pin server at the given base URL (e.g. "http://192.168.1.125:9090"). */
-  connect: (baseUrl: string) => Promise<void>;
-  /** Disconnect from the current server. */
-  disconnect: () => void;
-  /** Delete a memory by UUID. */
-  deleteMemory: (uuid: string) => Promise<void>;
-  /** The base URL of the connected server (for building asset URLs). */
-  baseUrl: string | null;
-}
-
-const PinContext = createContext<PinContextValue | null>(null);
-
-const STORAGE_KEY = "pin-center:baseUrl";
-
-export function loadSavedUrl(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch (error) {
-    logWarn("pin-provider", "Failed to load saved URL from storage", {
-      error,
-    });
-    return null;
-  }
-}
-
-function saveUrl(url: string | null) {
-  try {
-    if (url) {
-      localStorage.setItem(STORAGE_KEY, url);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch (error) {
-    logWarn("pin-provider", "Failed to save URL to storage", {
-      url,
-      error,
-    });
-  }
-}
-
 export function PinProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<ConnectionStatus>(
-    loadSavedUrl() ? "connecting" : "disconnected",
-  );
-  const [baseUrl, setBaseUrl] = useState<string | null>(null);
+  const [status, setStatus] = useState<ConnectionStatus>(loadInitialConnectionState);
+  const [baseUrl, setBaseUrl] = useState<string | null>(loadSavedUrl);
   const [client, setClient] = useState<PinClient | null>(null);
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [memoriesLoaded, setMemoriesLoaded] = useState(false);
+  const autoReconnectAttemptedRef = useRef(false);
 
   // Attempt connection to a Pin server.
   const connect = useCallback(async (url: string) => {
@@ -85,6 +31,10 @@ export function PinProvider({ children }: { children: ReactNode }) {
       normalized,
     });
     setStatus("connecting");
+    setBaseUrl(normalized);
+    setClient(null);
+    setDevice(null);
+    setMemories([]);
     setMemoriesLoaded(false);
 
     try {
@@ -111,6 +61,10 @@ export function PinProvider({ children }: { children: ReactNode }) {
         memoryCount: memoryList.length,
       });
     } catch (error) {
+      setClient(null);
+      setDevice(null);
+      setMemories([]);
+      setMemoriesLoaded(false);
       setStatus("disconnected");
       logError("pin-provider", "Failed to connect to Pin server", error, {
         normalized,
@@ -179,8 +133,17 @@ export function PinProvider({ children }: { children: ReactNode }) {
 
   // Auto-reconnect on mount if we have a saved URL.
   useEffect(() => {
+    if (autoReconnectAttemptedRef.current) {
+      return;
+    }
+
+    autoReconnectAttemptedRef.current = true;
     const saved = loadSavedUrl();
-    if (saved) {
+    if (!saved) {
+      return;
+    }
+
+    queueMicrotask(() => {
       logInfo("pin-provider", "Attempting auto-reconnect from saved URL", {
         saved,
       });
@@ -189,9 +152,8 @@ export function PinProvider({ children }: { children: ReactNode }) {
           saved,
         });
       });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    });
+  }, [connect]);
 
   const value = useMemo<PinContextValue>(
     () => ({
@@ -221,8 +183,3 @@ export function PinProvider({ children }: { children: ReactNode }) {
   return <PinContext.Provider value={value}>{children}</PinContext.Provider>;
 }
 
-export function usePin(): PinContextValue {
-  const ctx = useContext(PinContext);
-  if (!ctx) throw new Error("usePin() must be used within <PinProvider>");
-  return ctx;
-}

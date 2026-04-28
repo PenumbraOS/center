@@ -1,0 +1,38 @@
+/* App-local vendored theme primitives derived from website/site/assets/css/main.css */
+
+:root {
+  --color-beam: #00ffe0;
+  --color-beam-dim: #00ccb3;
+  --color-beam-subtle: rgba(0, 255, 224, 0.1);
+
+  --color-eclipse: #0f0f0f;
+  --color-penumbra: #161616;
+  --color-umbra: #1e1e1e;
+  --color-surface: #262626;
+  --color-surface-hover: #2e2e2e;
+
+  --color-border: #2a2a2a;
+  --color-border-light: #333;
+
+  --color-text: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.55);
+  --color-text-muted: rgba(255, 255, 255, 0.35);
+  --color-text-heading: rgba(255, 255, 255, 0.95);
+
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --transition: 150ms ease;
+}

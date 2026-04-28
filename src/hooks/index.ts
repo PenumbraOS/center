@@ -1,2 +1,4 @@
-export { PinProvider, usePin, loadSavedUrl } from "./PinProvider";
+export { PinProvider } from "./PinProvider";
+export { usePin } from "./pinContext";
+export { loadSavedUrl, saveUrl, loadInitialConnectionState } from "./pinStorage";
 export { useEventStream } from "./useEventStream";

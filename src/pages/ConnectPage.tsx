@@ -1,13 +1,15 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { consumeFailedHandoffUrl } from "../handoff";
 import { usePin, loadSavedUrl } from "../hooks";
 import { logError, logInfo } from "../logging";
 
 export default function ConnectPage() {
   const { connect, status } = usePin();
   const navigate = useNavigate();
-  const [address, setAddress] = useState(() => loadSavedUrl() ?? "");
+  const failedHandoffPrefill = consumeFailedHandoffUrl();
+  const [address, setAddress] = useState(() => failedHandoffPrefill ?? loadSavedUrl() ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const isConnecting = status === "connecting";

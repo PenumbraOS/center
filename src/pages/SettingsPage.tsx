@@ -56,7 +56,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!client) return;
-    setLoading(true);
     logInfo("settings-page", "Loading settings", {
       baseUrl: client.baseUrl,
     });

@@ -1,4 +1,5 @@
-@import "../../../website/site/assets/css/main.css";
+@import "./styles/penumbra-theme.css";
+@import "./styles/app-primitives.css";
 
 :root {
   --color-success: #5fd19d;

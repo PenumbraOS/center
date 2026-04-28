@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { usePin } from "../hooks";
+import { saveHandoffUrl } from "../handoff";
 import { fetchAllInstallerAssets } from "../install/assets";
 import { getBrowserSupport } from "../install/browserSupport";
 import {
@@ -264,8 +263,6 @@ function createInstallProgressLogger(
 }
 
 export default function InstallPage() {
-  const navigate = useNavigate();
-  const { connect } = usePin();
   const transportRef = useRef<WebUsbAdbTransport | null>(null);
   const logcatControllerRef = useRef<LogcatStreamController | null>(null);
   const installerLogContainerRef = useRef<HTMLDivElement | null>(null);
@@ -789,7 +786,7 @@ export default function InstallPage() {
     }
   }
 
-  async function handleConnectServer() {
+  function handleConnectServer() {
     const normalized = normalizeServerUrl(remoteServer);
     if (!normalized) {
       const message = "Enter the remote server URL before connecting.";
@@ -801,33 +798,32 @@ export default function InstallPage() {
     setIsBusy(true);
     setError(null);
     transitionStage("connect-server");
-    logInfo("installer", "Portal connect requested from installer", {
+    logInfo("installer", "Portal handoff requested from installer", {
       normalized,
       path: window.location.pathname,
+      search: window.location.search,
     });
 
     try {
-      addLog("info", `Connecting portal to ${normalized}...`);
-      await connect(normalized);
-      addLog("success", "Portal connected to remote server.");
+      saveHandoffUrl(normalized);
+      addLog("success", `Saved center handoff target ${normalized}.`);
       setWizardStep("finish");
       transitionStage("complete");
-      navigate("/gallery");
+      window.location.assign("/center/");
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
-          : "Failed to connect portal to server.";
+          : "Failed to prepare portal handoff to server.";
       setError(message);
       setWizardStep("finish");
       setShowTroubleshooting(true);
       transitionStage("error");
-      logError("installer", "Portal connect from installer failed", err, {
+      logError("installer", "Portal handoff from installer failed", err, {
         normalized,
         path: window.location.pathname,
       });
       addLog("error", message);
-    } finally {
       setIsBusy(false);
     }
   }
@@ -858,10 +854,10 @@ export default function InstallPage() {
     <>
       <section className="app-page-header">
         <div className="container">
-          <Link to="/" className="back-link">
+          <a href="/center/" className="back-link">
             <span aria-hidden="true">←</span>
             <span>Back to setup options</span>
-          </Link>
+          </a>
           <div className="app-page-intro">
             <h1 className="app-page-title">Install to device over USB</h1>
             <p className="app-page-copy">
@@ -1130,7 +1126,7 @@ export default function InstallPage() {
                 {hasAnyRecoveryTargets && !isBusy && (
                   <div className="app-notice app-notice--info">
                     Need to remove the installed components? Use the dedicated recovery
-                    flow. <Link to="/recovery" className="app-text-link">Open recovery</Link>
+                    flow. <a href="/install/?view=recovery" className="app-text-link">Open recovery</a>
                   </div>
                 )}
 

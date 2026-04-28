@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { usePin } from "../hooks";
 
 export default function DevicePage() {
@@ -105,9 +104,9 @@ export default function DevicePage() {
               Need to remove the installed hook stack or reboot after a recovery action?
             </p>
             <div className="app-inline-actions">
-              <Link to="/recovery" className="hero-cta hero-cta--secondary app-button">
+              <a href="/install/?view=recovery" className="hero-cta hero-cta--secondary app-button">
                 Open recovery
-              </Link>
+              </a>
             </div>
           </section>
 
