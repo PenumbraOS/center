@@ -56,12 +56,7 @@ export function logError(
 ) {
   if (errorOrMeta instanceof Error) {
     if (meta !== undefined) {
-      console.error(formatScope(scope), message, {
-        ...meta,
-        errorName: errorOrMeta.name,
-        errorMessage: errorOrMeta.message,
-        stack: errorOrMeta.stack,
-      });
+      console.error(formatScope(scope), message, errorOrMeta, meta);
     } else {
       console.error(formatScope(scope), message, errorOrMeta);
     }

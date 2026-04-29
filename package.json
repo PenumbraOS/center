@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_LOCAL_APK_MODE=true && vite",
     "build": "tsc -b && vite build",
     "build:install": "tsc -b && vite build --config vite.install.config.ts",
     "build:center": "tsc -b && vite build --config vite.center.config.ts",
@@ -34,6 +34,6 @@
     "tailwindcss": "^4.2.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.4"
+    "vite": "^8.0.10"
   }
 }
