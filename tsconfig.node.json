@@ -25,6 +25,7 @@
     "vite.shared.config.ts",
     "vite.install.config.ts",
     "vite.center.config.ts",
+    "vitest.config.ts",
     "scripts/**/*.mjs"
   ]
 }

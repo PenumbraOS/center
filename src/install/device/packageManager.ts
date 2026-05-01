@@ -1,0 +1,144 @@
+import type { AdbSessionTransport, ShellResult } from "./adbTransport";
+
+export const MANAGED_PACKAGES = {
+  installer: "com.penumbraos.systeminjector",
+  exploitHelper: "com.penumbraos.systeminjector.exploit",
+  hook: "com.penumbraos.hook",
+  server: "com.penumbraos.server",
+  injector: "com.penumbraos.hook.injector",
+} as const;
+
+export const PACKAGE_METADATA_POLL_INTERVAL_MS = 3000;
+export const PACKAGE_METADATA_POLL_TIMEOUT_MS = 120000;
+
+export interface InstalledPackageMetadata {
+  readonly packageName: string;
+  readonly versionName: string | null;
+  readonly querySucceeded: boolean;
+  readonly rawOutput: string;
+}
+
+export interface PackageEnableDisableResult {
+  readonly packageName: string;
+  readonly success: boolean;
+  readonly message: string;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+export function hasExactPackageLine(output: string, packageName: string): boolean {
+  const exactLine = `package:${packageName}`;
+  return output
+    .split(/\r?\n/)
+    .some((line) => line.trim() === exactLine);
+}
+
+export function parseVersionNameFromDumpsys(output: string): string | null {
+  const match = output.match(/(?:^|\s)versionName=([^\s]+)/m);
+  return match?.[1] ?? null;
+}
+
+function ensureShellSuccess(result: ShellResult, fallbackMessage: string) {
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || result.stdout.trim() || fallbackMessage);
+  }
+}
+
+export async function packageExists(
+  transport: AdbSessionTransport,
+  packageName: string,
+): Promise<boolean> {
+  const result = await transport.shell(["pm", "list", "packages", packageName]);
+  return hasExactPackageLine(result.stdout, packageName);
+}
+
+export async function getInstalledPackageMetadata(
+  transport: AdbSessionTransport,
+  packageName: string,
+): Promise<InstalledPackageMetadata | null> {
+  const installed = await packageExists(transport, packageName);
+  if (!installed) {
+    return null;
+  }
+
+  const result = await transport.shell(["dumpsys", "package", packageName]);
+  const rawOutput = `${result.stdout}\n${result.stderr}`.trim();
+
+  return {
+    packageName,
+    versionName: parseVersionNameFromDumpsys(rawOutput),
+    querySucceeded: result.exitCode === 0,
+    rawOutput,
+  };
+}
+
+export async function waitForReadablePackageMetadata(
+  transport: AdbSessionTransport,
+  packageName: string,
+  intervalMs = PACKAGE_METADATA_POLL_INTERVAL_MS,
+  timeoutMs = PACKAGE_METADATA_POLL_TIMEOUT_MS,
+): Promise<InstalledPackageMetadata> {
+  const start = Date.now();
+  let lastMetadata: InstalledPackageMetadata | null = null;
+
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const metadata = await getInstalledPackageMetadata(transport, packageName);
+      if (metadata) {
+        lastMetadata = metadata;
+        if (metadata.querySucceeded && metadata.versionName) {
+          return metadata;
+        }
+      }
+    } catch {
+      // Retry until timeout.
+    }
+
+    await sleep(intervalMs);
+  }
+
+  if (lastMetadata) {
+    throw new Error(
+      `Timed out waiting for readable package metadata for ${packageName}. Last observed versionName=${lastMetadata.versionName ?? "<missing>"}.`,
+    );
+  }
+
+  throw new Error(`Timed out waiting for package metadata for ${packageName}.`);
+}
+
+export async function uninstallPackage(
+  transport: AdbSessionTransport,
+  packageName: string,
+): Promise<void> {
+  const result = await transport.shell(["pm", "uninstall", packageName]);
+  ensureShellSuccess(result, `pm uninstall failed for ${packageName}`);
+}
+
+export async function disablePackageForUser(
+  transport: AdbSessionTransport,
+  packageName: string,
+): Promise<PackageEnableDisableResult> {
+  const result = await transport.shell(["pm", "disable-user", "--user", "0", packageName]);
+
+  return {
+    packageName,
+    success: result.exitCode === 0,
+    message:
+      result.stderr.trim() || result.stdout.trim() || `disable-user completed for ${packageName}`,
+  };
+}
+
+export async function enablePackageForUser(
+  transport: AdbSessionTransport,
+  packageName: string,
+): Promise<PackageEnableDisableResult> {
+  const result = await transport.shell(["pm", "enable", "--user", "0", packageName]);
+
+  return {
+    packageName,
+    success: result.exitCode === 0,
+    message: result.stderr.trim() || result.stdout.trim() || `enable completed for ${packageName}`,
+  };
+}

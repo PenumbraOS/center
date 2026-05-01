@@ -78,8 +78,8 @@ export default function SetupPage() {
               and uses WebUSB to talk to the device over ADB.
             </p>
             <p>
-              The selected remote server is currently used for the final portal
-              connection handoff and stored as the intended backend target.
+              After installation completes, return to Center and enter your remote
+              server address there.
             </p>
           </section>
         </div>

@@ -1,0 +1,175 @@
+import { deriveInstallActionState } from "./actionState";
+import { getDeviceIdentity, type DeviceIdentity } from "../device/deviceIdentity";
+import {
+  MANAGED_PACKAGES,
+  getInstalledPackageMetadata,
+  type InstalledPackageMetadata,
+} from "../device/packageManager";
+import {
+  inspectPackageQueryability,
+  type DeviceReadinessResult,
+} from "../device/readiness";
+import { classifyInstalledVersion } from "./versions";
+import type {
+  InstallActionState,
+  ManagedPackageInspection,
+  ManagedPackageRole,
+} from "./types";
+import type { AdbSessionTransport } from "../device/adbTransport";
+import type { ResolvedInstallTarget } from "../releases/assets";
+
+export interface ManagedPackageVersionSnapshot {
+  readonly role: ManagedPackageRole;
+  readonly packageName: string;
+  readonly installed: boolean;
+  readonly healthy: boolean;
+  readonly versionName: string | null;
+  readonly versionReadable: boolean;
+  readonly querySucceeded: boolean;
+  readonly rawOutput: string | null;
+  readonly targetVersion: string;
+  readonly versionComparison: ManagedPackageInspection["versionComparison"];
+}
+
+export interface InstallInspectionResult {
+  readonly device: DeviceIdentity;
+  readonly target: ResolvedInstallTarget | null;
+  readonly targetResolutionFailed: boolean;
+  readonly targetResolutionErrorMessage: string | null;
+  readonly helperPresentUnexpectedly: boolean;
+  readonly readiness: DeviceReadinessResult;
+  readonly packages: Record<ManagedPackageRole, ManagedPackageVersionSnapshot>;
+  readonly actionState: InstallActionState;
+  readonly installActionsBlocked: boolean;
+  readonly installActionsBlockedReason: string | null;
+}
+
+function getTargetVersionForRole(role: ManagedPackageRole, target: ResolvedInstallTarget | null): string | null {
+  if (!target) {
+    return null;
+  }
+
+  if (role === "installer") {
+    return target.systemInjector.release.tagName;
+  }
+
+  return target.humaneSystemHook.release.tagName;
+}
+
+function createPackageSnapshot(
+  role: ManagedPackageRole,
+  packageName: string,
+  metadata: InstalledPackageMetadata | null,
+  targetVersion: string | null,
+  readiness: DeviceReadinessResult,
+): ManagedPackageVersionSnapshot {
+  const readinessEntry = readiness.packageResults.find((entry) => entry.packageName === packageName);
+  const installed = metadata !== null;
+  const versionReadable = metadata?.versionName != null;
+  const versionComparison =
+    installed && targetVersion
+      ? classifyInstalledVersion(metadata?.versionName ?? null, targetVersion)
+      : null;
+
+  return {
+    role,
+    packageName,
+    installed,
+    healthy: installed && (readinessEntry?.queryable ?? false),
+    versionName: metadata?.versionName ?? null,
+    versionReadable,
+    querySucceeded: metadata?.querySucceeded ?? false,
+    rawOutput: metadata?.rawOutput ?? null,
+    targetVersion: targetVersion ?? "unknown",
+    versionComparison,
+  };
+}
+
+export async function inspectInstallState(
+  transport: AdbSessionTransport,
+  options?: {
+    target?: ResolvedInstallTarget | null;
+    targetResolutionError?: Error | null;
+    readinessSettleDelayMs?: number;
+  },
+): Promise<InstallInspectionResult> {
+  const target = options?.target ?? null;
+  const targetResolutionError = options?.targetResolutionError ?? null;
+  const device = await getDeviceIdentity(transport);
+
+  const [installerMetadata, hookMetadata, serverMetadata, injectorMetadata, helperMetadata, readiness] =
+    await Promise.all([
+      getInstalledPackageMetadata(transport, MANAGED_PACKAGES.installer),
+      getInstalledPackageMetadata(transport, MANAGED_PACKAGES.hook),
+      getInstalledPackageMetadata(transport, MANAGED_PACKAGES.server),
+      getInstalledPackageMetadata(transport, MANAGED_PACKAGES.injector),
+      getInstalledPackageMetadata(transport, MANAGED_PACKAGES.exploitHelper),
+      inspectPackageQueryability(
+        transport,
+        [
+          MANAGED_PACKAGES.installer,
+          MANAGED_PACKAGES.hook,
+          MANAGED_PACKAGES.server,
+          MANAGED_PACKAGES.injector,
+        ],
+        options?.readinessSettleDelayMs,
+      ),
+    ]);
+
+  const packages: Record<ManagedPackageRole, ManagedPackageVersionSnapshot> = {
+    installer: createPackageSnapshot(
+      "installer",
+      MANAGED_PACKAGES.installer,
+      installerMetadata,
+      getTargetVersionForRole("installer", target),
+      readiness,
+    ),
+    hook: createPackageSnapshot(
+      "hook",
+      MANAGED_PACKAGES.hook,
+      hookMetadata,
+      getTargetVersionForRole("hook", target),
+      readiness,
+    ),
+    server: createPackageSnapshot(
+      "server",
+      MANAGED_PACKAGES.server,
+      serverMetadata,
+      getTargetVersionForRole("server", target),
+      readiness,
+    ),
+    injector: createPackageSnapshot(
+      "injector",
+      MANAGED_PACKAGES.injector,
+      injectorMetadata,
+      getTargetVersionForRole("injector", target),
+      readiness,
+    ),
+  };
+
+  const helperPresentUnexpectedly = helperMetadata !== null;
+  const actionState = deriveInstallActionState({
+    packages,
+    helperPresentUnexpectedly,
+    readinessOk: readiness.packageQueryabilityOk,
+  });
+
+  const targetResolutionFailed = targetResolutionError !== null;
+  const installActionsBlocked = targetResolutionFailed || target === null;
+  const installActionsBlockedReason = installActionsBlocked
+    ? targetResolutionError?.message ?? "Install-type actions are blocked until release targets are resolved."
+    : null;
+
+  return {
+    device,
+    target,
+    targetResolutionFailed,
+    targetResolutionErrorMessage: targetResolutionError?.message ?? null,
+    helperPresentUnexpectedly,
+    readiness,
+    packages,
+    actionState,
+    installActionsBlocked,
+    installActionsBlockedReason,
+  };
+}

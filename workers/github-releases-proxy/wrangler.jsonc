@@ -1,0 +1,12 @@
+{
+  "name": "proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-30",
+  "secrets": {
+    "required": [
+      "GITHUB_APP_CLIENT_ID",
+      "GITHUB_APP_INSTALLATION_ID",
+      "GITHUB_APP_PRIVATE_KEY"
+    ]
+  }
+}

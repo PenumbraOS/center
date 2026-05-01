@@ -1,7 +1,14 @@
-import type { BrowserSupportResult } from "./types";
+export interface BrowserSupportResult {
+  readonly supported: boolean;
+  readonly reasons: readonly string[];
+  readonly details: {
+    readonly secureContext: boolean;
+    readonly webUsb: boolean;
+  };
+}
 
 export function getBrowserSupport(): BrowserSupportResult {
-  const secureContext = window.isSecureContext;
+  const secureContext = globalThis.isSecureContext;
   const webUsb = typeof navigator !== "undefined" && "usb" in navigator;
 
   const reasons: string[] = [];

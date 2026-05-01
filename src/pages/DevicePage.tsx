@@ -99,18 +99,6 @@ export default function DevicePage() {
           </section>
 
           <section className="app-info-card app-flow app-flow--sm" style={{ gridColumn: "1 / -1" }}>
-            <h2 className="app-panel-title">Recovery</h2>
-            <p className="app-panel-copy">
-              Need to remove the installed hook stack or reboot after a recovery action?
-            </p>
-            <div className="app-inline-actions">
-              <a href="/install/?view=recovery" className="hero-cta hero-cta--secondary app-button">
-                Open recovery
-              </a>
-            </div>
-          </section>
-
-          <section className="app-info-card app-flow app-flow--sm" style={{ gridColumn: "1 / -1" }}>
             <h2 className="app-panel-title">Connection</h2>
             <p className="app-panel-copy">
               Disconnect from this Pin server to connect to a different one.

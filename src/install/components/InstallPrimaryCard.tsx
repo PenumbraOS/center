@@ -1,0 +1,274 @@
+import type { InstallController } from "../app/useInstallController";
+import {
+  derivePrimaryCardViewModel,
+  type PrimaryCardActionViewModel,
+} from "../presentation/primaryCardViewModel";
+
+function runAction(options: {
+  action: PrimaryCardActionViewModel;
+  controller: InstallController;
+  onPrimaryAction: () => void;
+  onRollback: () => void;
+  onUninstall: () => void;
+}) {
+  const { action, controller, onPrimaryAction, onRollback, onUninstall } =
+    options;
+
+  if (action.disabled) {
+    return;
+  }
+
+  if (action.key === "rollback") {
+    onRollback();
+    return;
+  }
+
+  if (action.key === "primaryAction") {
+    onPrimaryAction();
+    return;
+  }
+
+  if (action.key === "uninstall") {
+    onUninstall();
+    return;
+  }
+
+  if (action.key === "connect") {
+    void controller.connectAndInspect();
+    return;
+  }
+
+  if (action.key === "recheck") {
+    void controller.recheck();
+    return;
+  }
+
+  if (action.key === "startOver") {
+    void controller.startOver();
+  }
+}
+
+function PrimaryButton({
+  action,
+  controller,
+  onPrimaryAction,
+  onRollback,
+  onUninstall,
+}: {
+  action: PrimaryCardActionViewModel;
+  controller: InstallController;
+  onPrimaryAction: () => void;
+  onRollback: () => void;
+  onUninstall: () => void;
+}) {
+  if (action.href) {
+    return (
+      <a href={action.href} className="install-stage__primary">
+        {action.label}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="install-stage__primary"
+      onClick={() =>
+        runAction({
+          action,
+          controller,
+          onPrimaryAction,
+          onRollback,
+          onUninstall,
+        })
+      }
+      disabled={action.disabled}
+      title={action.reason ?? undefined}
+    >
+      {action.label}
+    </button>
+  );
+}
+
+function SecondaryLink({
+  action,
+  controller,
+  onPrimaryAction,
+  onRollback,
+  onUninstall,
+}: {
+  action: PrimaryCardActionViewModel;
+  controller: InstallController;
+  onPrimaryAction: () => void;
+  onRollback: () => void;
+  onUninstall: () => void;
+}) {
+  if (action.href) {
+    return (
+      <a href={action.href} className="install-stage__link">
+        {action.label}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="install-stage__link"
+      onClick={() =>
+        runAction({
+          action,
+          controller,
+          onPrimaryAction,
+          onRollback,
+          onUninstall,
+        })
+      }
+      disabled={action.disabled}
+      title={action.reason ?? undefined}
+    >
+      {action.label}
+    </button>
+  );
+}
+
+export function InstallPrimaryCard({
+  controller,
+  onPrimaryAction,
+  onRollback,
+  onUninstall,
+}: {
+  controller: InstallController;
+  onPrimaryAction: () => void;
+  onRollback: () => void;
+  onUninstall: () => void;
+}) {
+  const viewModel = derivePrimaryCardViewModel(
+    controller.state,
+    controller.commands,
+  );
+
+  return (
+    <section className="install-stage" aria-labelledby="install-stage-title">
+      <div className="install-stage__content">
+        {viewModel.showHero ? (
+          <div className="install-stage__hero" aria-hidden="true">
+            <img
+              src="/install/ai-pin.png"
+              alt=""
+              className="install-stage__hero-image"
+            />
+          </div>
+        ) : null}
+
+        <header className="install-stage__heading">
+          <h1 id="install-stage-title" className="install-stage__title">
+            {viewModel.title}
+          </h1>
+          <p className="install-stage__copy">{viewModel.copy}</p>
+        </header>
+
+        {viewModel.notice ? (
+          <div
+            className={`install-stage__notice install-stage__notice--${viewModel.notice.tone}`}
+            role={viewModel.notice.tone === "danger" ? "alert" : "status"}
+          >
+            {viewModel.notice.text}
+          </div>
+        ) : null}
+
+        {viewModel.showProgress ? (
+          <div className="install-stage__progress" aria-live="polite">
+            <div className="install-stage__progress-meta">
+              <span>In progress</span>
+              <span>{viewModel.progressPercent}%</span>
+            </div>
+            <progress
+              className="app-progress-bar"
+              max={100}
+              value={viewModel.progressPercent}
+            />
+          </div>
+        ) : null}
+
+        {viewModel.device ? (
+          <section
+            className="install-stage__device"
+            aria-label="Connected device"
+          >
+            <div className="install-stage__device-head">
+              <div className="install-stage__device-identity">
+                <div className="install-stage__device-name">
+                  {viewModel.device.name}
+                </div>
+                <div className="install-stage__device-serial">
+                  {viewModel.device.serial}
+                </div>
+              </div>
+              {viewModel.device.badge ? (
+                <span className="install-stage__device-badge">
+                  {viewModel.device.badge}
+                </span>
+              ) : null}
+            </div>
+
+            {viewModel.packageRows.length > 0 ? (
+              <dl
+                className="install-stage__packages"
+                aria-label="Managed packages"
+              >
+                {viewModel.packageRows.map((pkg) => (
+                  <div key={pkg.role} className="install-stage__package">
+                    <dt>{pkg.role}</dt>
+                    <dd
+                      className={
+                        pkg.tone === "warning"
+                          ? "install-stage__package-value install-stage__package-value--warning"
+                          : "install-stage__package-value"
+                      }
+                      title={pkg.value}
+                    >
+                      {pkg.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+
+      <footer className="install-stage__footer">
+        <div className="install-stage__primary-slot">
+          {viewModel.primaryAction ? (
+            <PrimaryButton
+              action={viewModel.primaryAction}
+              controller={controller}
+              onPrimaryAction={onPrimaryAction}
+              onRollback={onRollback}
+              onUninstall={onUninstall}
+            />
+          ) : null}
+        </div>
+
+        <div className="install-stage__links-slot">
+          {viewModel.secondaryActions.length > 0 ? (
+            <nav className="install-stage__links" aria-label="More actions">
+              {viewModel.secondaryActions.map((action) => (
+                <span key={action.key} className="install-stage__link-item">
+                  <SecondaryLink
+                    action={action}
+                    controller={controller}
+                    onPrimaryAction={onPrimaryAction}
+                    onRollback={onRollback}
+                    onUninstall={onUninstall}
+                  />
+                </span>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+      </footer>
+    </section>
+  );
+}
