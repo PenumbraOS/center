@@ -134,6 +134,18 @@ function emitInstallerSubstep(
   });
 }
 
+function getShortAssetLabel(assetName: string): string {
+  // Strip leading "PenumbraOS-" prefix and trailing "-<version>.apk".
+  // e.g. "PenumbraOS-SystemInjector-Installer-2025-04-30.1.apk"
+  //   -> "SystemInjector-Installer"
+  const stripped = assetName.replace(/^PenumbraOS-/, "");
+  const versionStripped = stripped.replace(/-\d{4}-\d{2}-\d{2}\.\d+\.apk$/, "");
+  if (versionStripped !== stripped) {
+    return versionStripped;
+  }
+  return stripped.replace(/\.apk$/, "");
+}
+
 export async function runInstallOperation(
   options: InstallOperationOptions,
   internals: InstallOperationInternals = defaultInstallInternals,
@@ -160,7 +172,7 @@ export async function runInstallOperation(
         const assetLabel = assetIndex + 1;
         emitPhaseProgress(options.onProgress, {
           phase: "Assets",
-          message: `Downloading asset ${assetLabel} of ${assetCount}: ${assetName}`,
+          message: `Downloading ${getShortAssetLabel(assetName)} (${assetLabel} of ${assetCount})`,
           phaseIndex: 0,
           phaseCompleted: assetCompleted,
           phaseTotal: assetCount,
