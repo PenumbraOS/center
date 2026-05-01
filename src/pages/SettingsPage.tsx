@@ -46,13 +46,16 @@ export default function SettingsPage() {
     setProvider(next);
     setApiKey("");
     if (settings) {
-      setBaseUrl(next === settings.llm.provider ? (settings.llm.base_url ?? "") : "");
+      setBaseUrl(
+        next === settings.llm.provider ? (settings.llm.base_url ?? "") : "",
+      );
     } else {
       setBaseUrl("");
     }
   }
 
-  const isOriginalProvider = settings != null && provider === settings.llm.provider;
+  const isOriginalProvider =
+    settings != null && provider === settings.llm.provider;
 
   useEffect(() => {
     if (!client) return;
@@ -145,7 +148,8 @@ export default function SettingsPage() {
         baseUrl: client.baseUrl,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save settings";
+      const message =
+        err instanceof Error ? err.message : "Failed to save settings";
       logError("settings-page", "Failed to save settings", err, {
         baseUrl: client.baseUrl,
         request: req,
@@ -165,8 +169,7 @@ export default function SettingsPage() {
           <div className="app-page-intro">
             <h1 className="app-page-title">Settings</h1>
             <p className="app-page-copy">
-              Configure providers, backend details, and weather integrations for the
-              connected device.
+              Customize your PenumbraoOS experience.
             </p>
           </div>
         </div>
@@ -177,13 +180,19 @@ export default function SettingsPage() {
           <div className="app-button-row app-button-row--between">
             <div className="app-inline-actions">
               {saveStatus === "saving" && (
-                <span className="app-save-status app-save-status--saving">Saving…</span>
+                <span className="app-save-status app-save-status--saving">
+                  Saving…
+                </span>
               )}
               {saveStatus === "saved" && (
-                <span className="app-save-status app-save-status--saved">Saved</span>
+                <span className="app-save-status app-save-status--saved">
+                  Saved
+                </span>
               )}
               {saveStatus === "error" && (
-                <span className="app-save-status app-save-status--error">{saveError}</span>
+                <span className="app-save-status app-save-status--error">
+                  {saveError}
+                </span>
               )}
             </div>
             <button
@@ -191,7 +200,7 @@ export default function SettingsPage() {
               disabled={!isDirty || saveStatus === "saving"}
               className="hero-cta app-button"
             >
-              {saveStatus === "saving" ? "Saving..." : "Save changes"}
+              {saveStatus === "saving" ? "Saving..." : "Save Changes"}
             </button>
           </div>
 
@@ -286,7 +295,10 @@ export default function SettingsPage() {
                     <dt>Port</dt>
                     <dd className="app-value">
                       {settings.server.port}
-                      <span className="app-readonly-note"> (requires restart)</span>
+                      <span className="app-readonly-note">
+                        {" "}
+                        (requires restart)
+                      </span>
                     </dd>
                   </div>
                   {settings.server.public_addr && (
@@ -294,7 +306,10 @@ export default function SettingsPage() {
                       <dt>Public Address</dt>
                       <dd className="app-mono">
                         {settings.server.public_addr}
-                        <span className="app-readonly-note"> (requires restart)</span>
+                        <span className="app-readonly-note">
+                          {" "}
+                          (requires restart)
+                        </span>
                       </dd>
                     </div>
                   )}
@@ -328,6 +343,27 @@ export default function SettingsPage() {
                     <dd className="app-mono">{settings.storage.db_path}</dd>
                   </div>
                 </dl>
+              </section>
+
+              <section className="app-form-card">
+                <h2>Troubleshooting</h2>
+                <p className="home-card-desc">
+                  If you're having problems, you can uninstall and reinstall
+                  PenumbraOS from the Install page.
+                </p>
+                <div
+                  className="app-inline-actions"
+                  style={{ justifyContent: "center" }}
+                >
+                  <a
+                    className="install-stage__link"
+                    href="/install/"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    Install Options
+                  </a>
+                </div>
               </section>
             </div>
           )}
