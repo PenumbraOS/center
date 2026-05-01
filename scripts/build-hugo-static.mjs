@@ -43,6 +43,10 @@ async function main() {
   await cp(path.join(distInstallDir, "icons.svg"), path.join(distHugoDir, "install", "icons.svg"), {
     force: true,
   });
+  await cp(path.join(distInstallDir, "install"), path.join(distHugoDir, "install"), {
+    recursive: true,
+    force: true,
+  });
   await cp(path.join(distCenterDir, "center.html"), path.join(distHugoDir, "center", "index.html"), {
     force: true,
   });

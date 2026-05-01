@@ -19,7 +19,7 @@
   --color-text-muted: rgba(255, 255, 255, 0.35);
   --color-text-heading: rgba(255, 255, 255, 0.95);
 
-  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
 
   --space-xs: 0.25rem;

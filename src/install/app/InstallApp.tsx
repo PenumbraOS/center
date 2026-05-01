@@ -8,6 +8,8 @@ import {
   InstallPrimaryCard,
 } from "../components";
 import { useInstallActionConfirmation } from "./useInstallActionConfirmation";
+import SiteChrome from "../../components/SiteChrome";
+import SiteNav from "../../components/SiteNav";
 
 export default function InstallAppV1() {
   const createTransport = useCallback(
@@ -17,8 +19,8 @@ export default function InstallAppV1() {
       }),
     [],
   );
-
   const controller = useInstallController(createTransport);
+
   const confirmation = useInstallActionConfirmation({
     state: controller.state,
     commands: controller.commands,
@@ -28,29 +30,31 @@ export default function InstallAppV1() {
   });
 
   return (
-    <main className="app-shell install-page">
-      <section className="install-page__section">
-        <div className="install-page__column">
-          <InstallPrimaryCard
-            controller={controller}
-            onPrimaryAction={() => {
-              void confirmation.requestPrimaryAction();
-            }}
-            onRollback={() => {
-              void confirmation.requestRollback();
-            }}
-            onUninstall={() => {
-              void confirmation.requestUninstall();
-            }}
-          />
-          <InstallDiagnosticsCard state={controller.state} />
-        </div>
-      </section>
-      <ConfirmActionModal
-        dialog={confirmation.dialog}
-        onCancel={confirmation.dismissDialog}
-        onConfirm={confirmation.confirmDialog}
-      />
-    </main>
+    <SiteChrome nav={<SiteNav disabled />}>
+      <div className="install-page">
+        <section className="install-page__section">
+          <div className="install-page__column">
+            <InstallPrimaryCard
+              controller={controller}
+              onPrimaryAction={() => {
+                void confirmation.requestPrimaryAction();
+              }}
+              onRollback={() => {
+                void confirmation.requestRollback();
+              }}
+              onUninstall={() => {
+                void confirmation.requestUninstall();
+              }}
+            />
+            <InstallDiagnosticsCard state={controller.state} />
+          </div>
+        </section>
+        <ConfirmActionModal
+          dialog={confirmation.dialog}
+          onCancel={confirmation.dismissDialog}
+          onConfirm={confirmation.confirmDialog}
+        />
+      </div>
+    </SiteChrome>
   );
 }

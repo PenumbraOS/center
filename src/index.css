@@ -414,11 +414,18 @@ button {
   background:
     radial-gradient(1200px 600px at 50% -10%, rgba(0, 255, 224, 0.04), transparent 60%),
     var(--color-eclipse);
-  min-height: 100vh;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+}
+
+.nav-link--disabled {
+  color: var(--color-text-muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .install-page__section {

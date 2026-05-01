@@ -20,25 +20,32 @@ function shouldShowPackageDumpsys(pkg: {
     return false;
   }
 
-  return pkg.installed && (!pkg.versionReadable || pkg.versionComparison === "unreadable");
+  return (
+    pkg.installed &&
+    (!pkg.versionReadable || pkg.versionComparison === "unreadable")
+  );
 }
 
-function KvRow({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
+function KvRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+}) {
   return (
     <div className="install-diagnostics__kv-row">
       <dt>{label}</dt>
-      <dd className={mono ? "install-diagnostics__mono" : undefined}>{value}</dd>
+      <dd className={mono ? "install-diagnostics__mono" : undefined}>
+        {value}
+      </dd>
     </div>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="install-diagnostics__section">
       <h3 className="install-diagnostics__section-title">{title}</h3>
@@ -60,9 +67,9 @@ export function InstallDiagnosticsCard({
     <details className="install-diagnostics" open={isError}>
       <summary>
         <div className="install-diagnostics__heading">
-          <span className="install-diagnostics__title">Technical details</span>
+          <span className="install-diagnostics__title">Debugging</span>
           <span className="install-diagnostics__subtitle">
-            Device state, release target, and operation log
+            Download logs and diagnostic information
           </span>
         </div>
         <svg
@@ -102,12 +109,17 @@ export function InstallDiagnosticsCard({
         {state.inspection ? (
           <Section title="Device">
             <dl className="install-diagnostics__kv">
-              <KvRow label="Manufacturer" value={state.inspection.device.manufacturer} />
+              <KvRow
+                label="Manufacturer"
+                value={state.inspection.device.manufacturer}
+              />
               <KvRow label="Model" value={state.inspection.device.model} />
               <KvRow label="Product" value={state.inspection.device.product} />
               <KvRow
                 label="Build fingerprint"
-                value={state.inspection.device.buildFingerprint || "Unavailable"}
+                value={
+                  state.inspection.device.buildFingerprint || "Unavailable"
+                }
                 mono
               />
             </dl>
@@ -123,13 +135,20 @@ export function InstallDiagnosticsCard({
                     {formatManagedPackageRole(pkg.role)}
                   </span>
                   <span className="install-diagnostics__package-version">
-                    {getDisplayedPackageVersion(pkg.versionName, pkg.installed)} → {pkg.targetVersion}
+                    {getDisplayedPackageVersion(pkg.versionName, pkg.installed)}{" "}
+                    → {pkg.targetVersion}
                   </span>
                 </div>
                 <dl className="install-diagnostics__kv">
-                  <KvRow label="Installed" value={pkg.installed ? "Yes" : "No"} />
+                  <KvRow
+                    label="Installed"
+                    value={pkg.installed ? "Yes" : "No"}
+                  />
                   <KvRow label="Healthy" value={pkg.healthy ? "Yes" : "No"} />
-                  <KvRow label="Comparison" value={pkg.versionComparison ?? "Unknown"} />
+                  <KvRow
+                    label="Comparison"
+                    value={pkg.versionComparison ?? "Unknown"}
+                  />
                   <KvRow label="Package" value={pkg.packageName} mono />
                 </dl>
                 {shouldShowPackageDumpsys(pkg) && pkg.rawOutput ? (
@@ -137,7 +156,9 @@ export function InstallDiagnosticsCard({
                     <summary className="install-diagnostics__dump-toggle">
                       View dumpsys output
                     </summary>
-                    <pre className="install-diagnostics__dump">{pkg.rawOutput}</pre>
+                    <pre className="install-diagnostics__dump">
+                      {pkg.rawOutput}
+                    </pre>
                   </details>
                 ) : null}
               </div>
@@ -148,8 +169,14 @@ export function InstallDiagnosticsCard({
         {state.target ? (
           <Section title="Release target">
             <dl className="install-diagnostics__kv">
-              <KvRow label="System Injector" value={state.target.systemInjector.release.tagName} />
-              <KvRow label="Humane Hook" value={state.target.humaneSystemHook.release.tagName} />
+              <KvRow
+                label="System Injector"
+                value={state.target.systemInjector.release.tagName}
+              />
+              <KvRow
+                label="Humane Hook"
+                value={state.target.humaneSystemHook.release.tagName}
+              />
               <KvRow
                 label="Installer"
                 value={state.target.systemInjector.assets.installerApk.name}
@@ -175,7 +202,10 @@ export function InstallDiagnosticsCard({
                 value={state.target.humaneSystemHook.assets.injectorApk.name}
                 mono
               />
-              <KvRow label="Locked at" value={state.targetLock?.lockedAt ?? "Not locked"} />
+              <KvRow
+                label="Locked at"
+                value={state.targetLock?.lockedAt ?? "Not locked"}
+              />
             </dl>
           </Section>
         ) : null}
@@ -213,10 +243,16 @@ export function InstallDiagnosticsCard({
             <ul className="install-diagnostics__log">
               {state.progressEntries.map((entry) => (
                 <li key={entry.id} className="install-diagnostics__log-entry">
-                  <span className="install-diagnostics__log-phase">{entry.phase}</span>
+                  <span className="install-diagnostics__log-phase">
+                    {entry.phase}
+                  </span>
                   <div>
-                    <div className="install-diagnostics__log-message">{entry.message}</div>
-                    <div className="install-diagnostics__log-time">{entry.timestamp}</div>
+                    <div className="install-diagnostics__log-message">
+                      {entry.message}
+                    </div>
+                    <div className="install-diagnostics__log-time">
+                      {entry.timestamp}
+                    </div>
                   </div>
                 </li>
               ))}
