@@ -225,11 +225,7 @@ export function InstallPrimaryCard({
                   <div key={pkg.role} className="install-stage__package">
                     <dt>{pkg.role}</dt>
                     <dd
-                      className={
-                        pkg.tone === "warning"
-                          ? "install-stage__package-value install-stage__package-value--warning"
-                          : "install-stage__package-value"
-                      }
+                      className={`install-stage__package-value install-stage__package-value--${pkg.tone}`}
                       title={pkg.value}
                     >
                       {pkg.value}
@@ -285,10 +281,7 @@ export function InstallPrimaryCard({
         </div>
       </footer>
 
-      <ConnectionHelpModal
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-      />
+      <ConnectionHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </section>
   );
 }

@@ -681,6 +681,14 @@ button {
   color: var(--color-warning);
 }
 
+.install-stage__package-value--success {
+  color: var(--color-success);
+}
+
+.install-stage__package-value--default {
+  color: var(--color-text);
+}
+
 /* Footer / actions */
 
 .install-stage__footer {

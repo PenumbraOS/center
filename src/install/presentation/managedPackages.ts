@@ -15,7 +15,10 @@ export function formatManagedPackageRole(role: ManagedPackageRole) {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-export function getDisplayedPackageVersion(versionName: string | null, installed: boolean) {
+export function getDisplayedPackageVersion(
+  versionName: string | null,
+  installed: boolean,
+) {
   if (!installed) {
     return "Not installed";
   }
@@ -23,9 +26,13 @@ export function getDisplayedPackageVersion(versionName: string | null, installed
   return versionName ?? "Unreadable";
 }
 
-export function getManagedPackageStatusText(pkg: ManagedPackageVersionSnapshot) {
+export type ManagedPackageStatusTone = "default" | "success" | "warning";
+
+export function getManagedPackageStatusText(
+  pkg: ManagedPackageVersionSnapshot,
+) {
   if (!pkg.installed) {
-    return "Not installed";
+    return "Not Installed";
   }
 
   if (!pkg.healthy) {
@@ -33,7 +40,7 @@ export function getManagedPackageStatusText(pkg: ManagedPackageVersionSnapshot) 
   }
 
   if (pkg.versionComparison === "older") {
-    return "Older";
+    return "Update Available";
   }
 
   if (pkg.versionComparison === "newer") {
@@ -44,10 +51,30 @@ export function getManagedPackageStatusText(pkg: ManagedPackageVersionSnapshot) 
     return "Unreadable";
   }
 
+  if (pkg.versionComparison === "equal") {
+    return "Up to Date";
+  }
+
   return "";
 }
 
-export function hasProblematicManagedPackageState(pkg: ManagedPackageVersionSnapshot) {
+export function getManagedPackageStatusTone(
+  pkg: ManagedPackageVersionSnapshot,
+): ManagedPackageStatusTone {
+  if (hasProblematicManagedPackageState(pkg)) {
+    return "warning";
+  }
+
+  if (pkg.installed && pkg.healthy && pkg.versionComparison === "equal") {
+    return "success";
+  }
+
+  return "default";
+}
+
+export function hasProblematicManagedPackageState(
+  pkg: ManagedPackageVersionSnapshot,
+) {
   return (
     !pkg.installed ||
     !pkg.healthy ||
@@ -71,6 +98,8 @@ export function getUnreadableManagedPackages(
   inspection: InstallInspectionResult | null,
 ): ManagedPackageVersionSnapshot[] {
   return getManagedPackageSnapshots(inspection).filter(
-    (pkg) => pkg.installed && (pkg.versionComparison === "unreadable" || !pkg.versionReadable),
+    (pkg) =>
+      pkg.installed &&
+      (pkg.versionComparison === "unreadable" || !pkg.versionReadable),
   );
 }

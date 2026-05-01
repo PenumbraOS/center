@@ -12,7 +12,7 @@ import {
   getDisplayedPackageVersion,
   getManagedPackageSnapshots,
   getManagedPackageStatusText,
-  hasProblematicManagedPackageState,
+  getManagedPackageStatusTone,
 } from "./managedPackages";
 
 export interface PrimaryCardActionViewModel {
@@ -33,7 +33,7 @@ export interface PrimaryCardActionViewModel {
 export interface PrimaryCardPackageRowViewModel {
   readonly role: string;
   readonly value: string;
-  readonly tone: "default" | "warning";
+  readonly tone: "default" | "success" | "warning";
 }
 
 export interface PrimaryCardDeviceViewModel {
@@ -266,8 +266,9 @@ function getCompactPackageValue(pkg: ManagedPackageVersionSnapshot) {
     pkg.installed,
   );
   const status = getManagedPackageStatusText(pkg);
-  const targetSuffix =
-    status && pkg.targetVersion !== "unknown" ? ` -> ${pkg.targetVersion}` : "";
+  const showTargetSuffix =
+    status && status !== "Up to Date" && pkg.targetVersion !== "unknown";
+  const targetSuffix = showTargetSuffix ? ` -> ${pkg.targetVersion}` : "";
 
   if (!pkg.installed) {
     return clampText(`Not installed${targetSuffix}`, 52);
@@ -309,7 +310,7 @@ function getPackageRows(
     return {
       role: formatManagedPackageRole(pkg.role),
       value: getCompactPackageValue(pkg),
-      tone: hasProblematicManagedPackageState(pkg) ? "warning" : "default",
+      tone: getManagedPackageStatusTone(pkg),
     };
   });
 }
