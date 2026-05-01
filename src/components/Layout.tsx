@@ -78,10 +78,10 @@ export default function Layout() {
   return (
     <>
       <SiteChrome
-        nav={connected ? <SiteNav /> : null}
         meta={
           <>
             <StatusIndicator status={status} />
+            {connected ? <SiteNav /> : null}
           </>
         }
       >

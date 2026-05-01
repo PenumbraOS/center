@@ -423,6 +423,23 @@ button {
   pointer-events: none;
 }
 
+.nav-link--pill {
+  color: var(--color-beam);
+  border: 1px solid var(--color-beam-subtle);
+  background: var(--color-beam-subtle);
+  border-radius: 999px;
+  padding: var(--space-xs) var(--space-md);
+  transition: background var(--transition), border-color var(--transition),
+    color var(--transition);
+}
+
+.nav-link--pill:hover,
+.nav-link--pill.active {
+  color: var(--color-beam);
+  background: rgba(0, 255, 224, 0.18);
+  border-color: var(--color-beam-dim);
+}
+
 .install-page__section {
   width: 100%;
   padding: var(--space-2xl) var(--space-xl);

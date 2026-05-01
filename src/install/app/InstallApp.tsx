@@ -9,7 +9,6 @@ import {
 } from "../components";
 import { useInstallActionConfirmation } from "./useInstallActionConfirmation";
 import SiteChrome from "../../components/SiteChrome";
-import SiteNav from "../../components/SiteNav";
 
 export default function InstallAppV1() {
   const createTransport = useCallback(
@@ -30,7 +29,13 @@ export default function InstallAppV1() {
   });
 
   return (
-    <SiteChrome nav={<SiteNav disabled />}>
+    <SiteChrome
+      meta={
+        <a href="/center/" className="nav-link nav-link--pill">
+          Center
+        </a>
+      }
+    >
       <div className="install-page">
         <section className="install-page__section">
           <div className="install-page__column">
