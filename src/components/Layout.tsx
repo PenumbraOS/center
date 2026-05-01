@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { usePin } from "../hooks";
 import { logInfo, logWarn } from "../logging";
 import SiteChrome from "./SiteChrome";
@@ -11,7 +11,10 @@ function StatusIndicator({
   status: "connected" | "connecting" | "disconnected";
 }) {
   return (
-    <span className={`app-status-indicator app-status-indicator--${status}`} title={status}>
+    <span
+      className={`app-status-indicator app-status-indicator--${status}`}
+      title={status}
+    >
       <span className="app-status-indicator__dot" />
       <span>{status}</span>
     </span>
@@ -59,9 +62,13 @@ export default function Layout() {
         path: location.pathname,
       });
       const timer = setTimeout(() => {
-        logWarn("layout", "Connect timeout expired; redirecting to setup flow", {
-          path: location.pathname,
-        });
+        logWarn(
+          "layout",
+          "Connect timeout expired; redirecting to setup flow",
+          {
+            path: location.pathname,
+          },
+        );
         navigate("/", { replace: true });
       }, 5000);
       return () => clearTimeout(timer);
@@ -71,11 +78,6 @@ export default function Layout() {
   return (
     <>
       <SiteChrome
-        logoLinkRender={(content) => (
-          <NavLink to={connected ? "/gallery" : "/"} className="site-logo">
-            {content}
-          </NavLink>
-        )}
         nav={connected ? <SiteNav /> : null}
         meta={
           <>
