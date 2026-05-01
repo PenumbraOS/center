@@ -66,7 +66,7 @@ export function InstallActionsCard({
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-actions-title">
       <h2 id="install-actions-title" className="app-panel-title">
-        Available actions
+        Available Actions
       </h2>
 
       <div className="app-inline-actions">
@@ -138,7 +138,7 @@ export function InstallActionsCard({
       {state.stage === "result" && state.lastOperationResult?.kind === "install" && !state.lastOperationResult.result.success ? (
         <div className="app-notice app-notice--warning">
           Install changes were preserved for inspection. Use <strong>Recheck</strong> to inspect the
-          current device state, or <strong>Rollback install</strong> to undo the failed install.
+          current device state, or <strong>Rollback Install</strong> to undo the failed install.
         </div>
       ) : null}
     </section>

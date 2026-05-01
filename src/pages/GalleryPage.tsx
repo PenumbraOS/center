@@ -105,7 +105,7 @@ export default function GalleryPage() {
       <section className="app-page-content gallery">
         <div className="container">
           <div className="app-gallery-toolbar">
-            <div className="app-filter-row" role="tablist" aria-label="Memory type filters">
+            <div className="app-filter-row" role="tablist" aria-label="Memory Type Filters">
               {filters.map((f) => (
                 <button
                   key={f}

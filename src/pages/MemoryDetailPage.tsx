@@ -69,10 +69,10 @@ export default function MemoryDetailPage() {
         <div className="container">
           <button onClick={() => navigate("/gallery")} className="back-link app-button">
             <span aria-hidden="true">←</span>
-            <span>Back to gallery</span>
+            <span>Back to Gallery</span>
           </button>
           <div className="app-page-intro">
-            <h1 className="app-page-title">Memory details</h1>
+            <h1 className="app-page-title">Memory Details</h1>
             <p className="app-page-copy">
               Review associated media, timestamps, location details, files, and
               destructive actions for this memory.
@@ -220,7 +220,7 @@ export default function MemoryDetailPage() {
                   onClick={() => setConfirmDelete(true)}
                   className="app-button app-button--danger app-button--wide"
                 >
-                  Delete memory
+                  Delete Memory
                 </button>
               ) : (
                 <div className="app-flow app-flow--sm">
@@ -234,7 +234,7 @@ export default function MemoryDetailPage() {
                       disabled={deleting}
                       className="app-button app-button--danger"
                     >
-                      {deleting ? "Deleting..." : "Confirm delete"}
+                      {deleting ? "Deleting..." : "Confirm Delete"}
                     </button>
                     <button
                       onClick={() => setConfirmDelete(false)}

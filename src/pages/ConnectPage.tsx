@@ -50,10 +50,10 @@ export default function ConnectPage() {
         <div className="container">
           <Link to="/" className="back-link">
             <span aria-hidden="true">←</span>
-            <span>Back to setup options</span>
+            <span>Back to Setup Options</span>
           </Link>
           <div className="app-page-intro">
-            <h1 className="app-page-title">Connect to existing server</h1>
+            <h1 className="app-page-title">Connect to Existing Server</h1>
             <p className="app-page-copy">
               Enter your remote Pin server address to connect the portal.
             </p>

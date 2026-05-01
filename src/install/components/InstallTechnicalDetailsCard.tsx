@@ -50,14 +50,14 @@ export function InstallTechnicalDetailsCard({
   return (
     <details className="app-info-card app-flow app-flow--sm" open={autoOpen}>
       <summary className="app-toggle-header">
-        <span className="app-panel-title">Technical details</span>
-        <span className="app-readonly-note">Versions, targets, and progress logs</span>
+        <span className="app-panel-title">Technical Details</span>
+        <span className="app-readonly-note">Versions, Targets, and Progress Logs</span>
       </summary>
 
       <div className="app-flow app-flow--sm">
         {state.inspection ? (
           <section className="app-subpanel app-flow app-flow--sm">
-            <h3 className="app-panel-title">Device identity</h3>
+            <h3 className="app-panel-title">Device Identity</h3>
             <dl className="app-kv app-kv--compact">
               <div className="app-kv-item">
                 <dt className="home-card-subtitle">Manufacturer</dt>
@@ -81,7 +81,7 @@ export function InstallTechnicalDetailsCard({
 
         {state.inspection ? (
           <section className="app-subpanel app-flow app-flow--sm">
-            <h3 className="app-panel-title">Managed packages</h3>
+            <h3 className="app-panel-title">Managed Packages</h3>
             <div className="app-flow app-flow--sm">
               {PACKAGE_ROLE_ORDER.map((role) => {
                 const pkg = state.inspection?.packages[role];
@@ -129,7 +129,7 @@ export function InstallTechnicalDetailsCard({
 
         {state.target ? (
           <section className="app-subpanel app-flow app-flow--sm">
-            <h3 className="app-panel-title">Resolved release target</h3>
+            <h3 className="app-panel-title">Resolved Release Target</h3>
             <dl className="app-kv app-kv--compact">
               <div className="app-kv-item">
                 <dt className="home-card-subtitle">System Injector tag</dt>
@@ -168,7 +168,7 @@ export function InstallTechnicalDetailsCard({
         ) : null}
 
         <section className="app-subpanel app-flow app-flow--sm">
-          <h3 className="app-panel-title">Progress log</h3>
+          <h3 className="app-panel-title">Progress Log</h3>
           {state.progressEntries.length > 0 ? (
             <ul className="app-flow app-flow--sm" style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {state.progressEntries.map((entry) => (

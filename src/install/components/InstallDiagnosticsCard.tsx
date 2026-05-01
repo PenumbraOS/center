@@ -69,7 +69,7 @@ export function InstallDiagnosticsCard({
         <div className="install-diagnostics__heading">
           <span className="install-diagnostics__title">Debugging</span>
           <span className="install-diagnostics__subtitle">
-            Download logs and diagnostic information
+            Download Logs and Diagnostic Information
           </span>
         </div>
         <svg
@@ -90,7 +90,7 @@ export function InstallDiagnosticsCard({
 
       <div className="install-diagnostics__body">
         {supportFiles.length > 0 ? (
-          <Section title="Support bundle">
+          <Section title="Support Bundle">
             <div className="install-diagnostics__downloads">
               {supportFiles.map((file) => (
                 <button
@@ -116,7 +116,7 @@ export function InstallDiagnosticsCard({
               <KvRow label="Model" value={state.inspection.device.model} />
               <KvRow label="Product" value={state.inspection.device.product} />
               <KvRow
-                label="Build fingerprint"
+                label="Build Fingerprint"
                 value={
                   state.inspection.device.buildFingerprint || "Unavailable"
                 }
@@ -127,7 +127,7 @@ export function InstallDiagnosticsCard({
         ) : null}
 
         {state.inspection ? (
-          <Section title="Managed packages">
+          <Section title="Managed Packages">
             {packages.map((pkg) => (
               <div key={pkg.role} className="install-diagnostics__package">
                 <div className="install-diagnostics__package-head">
@@ -154,7 +154,7 @@ export function InstallDiagnosticsCard({
                 {shouldShowPackageDumpsys(pkg) && pkg.rawOutput ? (
                   <details>
                     <summary className="install-diagnostics__dump-toggle">
-                      View dumpsys output
+                      View Dumpsys Output
                     </summary>
                     <pre className="install-diagnostics__dump">
                       {pkg.rawOutput}
@@ -167,7 +167,7 @@ export function InstallDiagnosticsCard({
         ) : null}
 
         {state.target ? (
-          <Section title="Release target">
+          <Section title="Release Target">
             <dl className="install-diagnostics__kv">
               <KvRow
                 label="System Injector"
@@ -203,7 +203,7 @@ export function InstallDiagnosticsCard({
                 mono
               />
               <KvRow
-                label="Locked at"
+                label="Locked At"
                 value={state.targetLock?.lockedAt ?? "Not locked"}
               />
             </dl>
@@ -211,7 +211,7 @@ export function InstallDiagnosticsCard({
         ) : null}
 
         {state.lastOperationResult ? (
-          <Section title="Last operation">
+          <Section title="Last Operation">
             <dl className="install-diagnostics__kv">
               <KvRow label="Action" value={state.lastOperationResult.kind} />
               <KvRow
@@ -224,7 +224,7 @@ export function InstallDiagnosticsCard({
               />
               {"failedPhase" in state.lastOperationResult.result ? (
                 <KvRow
-                  label="Failed phase"
+                  label="Failed Phase"
                   value={state.lastOperationResult.result.failedPhase ?? "None"}
                 />
               ) : null}
@@ -238,7 +238,7 @@ export function InstallDiagnosticsCard({
           </Section>
         ) : null}
 
-        <Section title="Activity log">
+        <Section title="Activity Log">
           {state.progressEntries.length > 0 ? (
             <ul className="install-diagnostics__log">
               {state.progressEntries.map((entry) => (

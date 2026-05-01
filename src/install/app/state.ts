@@ -21,12 +21,12 @@ export type InstallControllerStage =
 
 export const STAGE_LABELS: Record<InstallControllerStage, string> = {
   intro: "Disconnected",
-  "unsupported-browser": "Unsupported browser",
+  "unsupported-browser": "Unsupported Browser",
   connecting: "Connecting",
   inspecting: "Inspecting",
   "connected-idle": "Connected",
   blocked: "Blocked",
-  operating: "Action in progress",
+  operating: "Action In Progress",
   result: "Result",
   error: "Error",
 };
@@ -363,7 +363,7 @@ export function deriveInstallControllerCommands(
   return {
     connect: {
       visible: !hasConnection && state.stage !== "result",
-      label: "Connect device",
+      label: "Connect Device",
       disabled: state.isBusy || !state.browserSupport.supported,
       reason: !state.browserSupport.supported
         ? "Use a secure desktop Chromium browser with WebUSB support."
@@ -402,7 +402,7 @@ export function deriveInstallControllerCommands(
         state.lastOperationResult?.kind === "install" &&
         !state.lastOperationResult.result.success &&
         state.lastOperationResult.result.rollbackAvailable,
-      label: "Rollback install",
+      label: "Rollback Install",
       disabled: state.isBusy || !hasConnection,
       reason: state.isBusy
         ? "Wait for the current task to finish."
@@ -451,7 +451,7 @@ export function deriveInstallControllerCommands(
         state.target !== null ||
         state.lastOperationResult !== null ||
         state.error !== null,
-      label: "Start over",
+      label: "Start Over",
       disabled: state.isBusy,
       reason: state.isBusy ? "The current action cannot be cancelled." : null,
     },

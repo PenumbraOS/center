@@ -198,7 +198,7 @@ export function InstallPrimaryCard({
         {viewModel.device ? (
           <section
             className="install-stage__device"
-            aria-label="Connected device"
+            aria-label="Connected Device"
           >
             <div className="install-stage__device-head">
               <div className="install-stage__device-identity">
@@ -219,7 +219,7 @@ export function InstallPrimaryCard({
             {viewModel.packageRows.length > 0 ? (
               <dl
                 className="install-stage__packages"
-                aria-label="Managed packages"
+                aria-label="Managed Packages"
               >
                 {viewModel.packageRows.map((pkg) => (
                   <div key={pkg.role} className="install-stage__package">
@@ -257,7 +257,7 @@ export function InstallPrimaryCard({
 
         <div className="install-stage__links-slot">
           {viewModel.secondaryActions.length > 0 || showConnectionHelp ? (
-            <nav className="install-stage__links" aria-label="More actions">
+            <nav className="install-stage__links" aria-label="More Actions">
               {viewModel.secondaryActions.map((action) => (
                 <span key={action.key} className="install-stage__link-item">
                   <SecondaryLink
@@ -276,7 +276,7 @@ export function InstallPrimaryCard({
                     className="install-stage__link"
                     onClick={() => setHelpOpen(true)}
                   >
-                    Connection help
+                    Connection Help
                   </button>
                 </span>
               ) : null}

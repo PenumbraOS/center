@@ -93,7 +93,7 @@ function getBaseSummary(state: InstallControllerState) {
     state.lastOperationResult.result.success
   ) {
     return {
-      title: "Install complete",
+      title: "Install Complete",
       copy:
         state.lastOperationResult.result.warnings.length > 0
           ? "Install finished with warnings. Review diagnostics or continue to Center."
@@ -109,7 +109,7 @@ function getBaseSummary(state: InstallControllerState) {
     !state.lastOperationResult.result.success
   ) {
     return {
-      title: "Install failed",
+      title: "Install Failed",
       copy:
         state.lastOperationResult.result.error?.message ??
         "The install did not complete. Review diagnostics, then recheck or roll back.",
@@ -124,8 +124,8 @@ function getBaseSummary(state: InstallControllerState) {
   ) {
     return {
       title: state.lastOperationResult.result.success
-        ? "Uninstall complete"
-        : "Uninstall failed",
+        ? "Uninstall Complete"
+        : "Uninstall Failed",
       copy:
         state.lastOperationResult.result.error?.message ??
         (state.lastOperationResult.result.success
@@ -138,7 +138,7 @@ function getBaseSummary(state: InstallControllerState) {
 
   if (state.stage === "blocked") {
     return {
-      title: "Install blocked",
+      title: "Install Blocked",
       copy: "Resolve the release target before continuing.",
       progressPercent: 0,
       showProgress: false,
@@ -165,7 +165,7 @@ function getBaseSummary(state: InstallControllerState) {
 
   if (state.stage === "unsupported-browser") {
     return {
-      title: "Unsupported browser",
+      title: "Unsupported Browser",
       copy: "Use a secure desktop Chromium browser with WebUSB support.",
       progressPercent: 0,
       showProgress: false,
@@ -174,7 +174,7 @@ function getBaseSummary(state: InstallControllerState) {
 
   if (state.stage === "error") {
     return {
-      title: state.connection ? "Action failed" : "Connection failed",
+      title: state.connection ? "Action Failed" : "Connection Failed",
       copy: state.connection
         ? "Review diagnostics, then recheck the device."
         : "Unable to connect to Ai Pin. Review diagnostics and reconnect.",

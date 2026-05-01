@@ -2,7 +2,7 @@ export function InstallWelcomeCard() {
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-welcome-title">
       <h2 id="install-welcome-title" className="app-panel-title">
-        Before you connect
+        Before You Connect
       </h2>
       <ul className="app-list">
         <li>Use a secure desktop Chromium browser.</li>

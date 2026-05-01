@@ -32,7 +32,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
       return (
         <div className="app-error-shell">
           <div className="app-danger-card app-error-card app-flow app-flow--sm">
-            <h1 className="app-page-title app-danger-title">Something went wrong</h1>
+            <h1 className="app-page-title app-danger-title">Something Went Wrong</h1>
             <p className="app-panel-copy">
               PenumbraOS hit an unexpected error. Open the browser console for details
               and reload the page to try again.

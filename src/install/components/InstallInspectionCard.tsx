@@ -24,7 +24,7 @@ export function InstallInspectionCard({
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-inspection-title">
       <h2 id="install-inspection-title" className="app-panel-title">
-        Device state
+        Device State
       </h2>
 
       <dl className="app-kv app-kv--compact">
@@ -47,9 +47,9 @@ export function InstallInspectionCard({
       </dl>
 
       {unreadablePackages.length > 0 ? (
-        <section className="app-subpanel app-flow app-flow--sm" aria-label="Unreadable package diagnostics">
+        <section className="app-subpanel app-flow app-flow--sm" aria-label="Unreadable Package Diagnostics">
           <div>
-            <div className="home-card-subtitle">Unreadable package diagnostics</div>
+            <div className="home-card-subtitle">Unreadable Package Diagnostics</div>
             <p className="app-panel-copy">
               These packages are installed, but their version metadata could not be parsed from
               `dumpsys package`. Expand Technical details below for the raw command output.

@@ -47,7 +47,7 @@ export function InstallProgressCard({
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-progress-title">
       <h2 id="install-progress-title" className="app-panel-title">
-        Action progress
+        Action Progress
       </h2>
       <p className="app-page-copy" aria-live="polite">
         {latestProgress?.message ?? "Preparing the requested action."}

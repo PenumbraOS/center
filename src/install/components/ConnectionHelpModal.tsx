@@ -9,12 +9,12 @@ type HelpLink = {
 // TODO: replace placeholder hrefs with real documentation URLs.
 const HELP_LINKS: HelpLink[] = [
   {
-    label: "Setting up the interposer",
+    label: "Setting Up the Interposer",
     href: "/getting-started/interposer/",
     description: "How to acquire an interposer.",
   },
   {
-    label: "Sticker removal",
+    label: "Sticker Removal",
     href: "/getting-started/sticker-removal/",
     description: "Removing the sticker from the bottom of Ai Pin.",
   },

@@ -19,7 +19,7 @@ export interface UnsavedChangesPromptProps {
  */
 export default function UnsavedChangesPrompt({
   when,
-  title = "Unsaved changes",
+  title = "Unsaved Changes",
   body = "You have unsaved changes that will be lost if you leave this page.",
   discardLabel = "Discard",
   stayLabel = "Stay",

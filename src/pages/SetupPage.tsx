@@ -6,7 +6,7 @@ export default function SetupPage() {
       <section className="app-page-header">
         <div className="container">
           <div className="app-page-intro">
-            <h1 className="app-page-title">Set up PenumbraOS</h1>
+            <h1 className="app-page-title">Set Up PenumbraOS</h1>
             <p className="app-page-copy">
               Connect this portal to an existing deployment, or install the required
               components to a USB-connected Pin directly from your browser.
@@ -22,7 +22,7 @@ export default function SetupPage() {
               <div className="app-flow app-flow--sm">
                 <p className="home-card-subtitle">Portal</p>
                 <h2 id="setup-connect-title" className="home-card-title">
-                  Connect to existing server
+                  Connect to Existing Server
                 </h2>
                 <p className="home-card-desc">
                   Use this if your remote or LAN-hosted server is already running and
@@ -38,7 +38,7 @@ export default function SetupPage() {
 
               <div className="app-inline-actions">
                 <Link to="/connect" className="hero-cta app-button">
-                  Connect to server
+                  Connect to Server
                 </Link>
               </div>
             </section>
@@ -47,7 +47,7 @@ export default function SetupPage() {
               <div className="app-flow app-flow--sm">
                 <p className="home-card-subtitle">Installer</p>
                 <h2 id="setup-install-title" className="home-card-title">
-                  Install to device over USB
+                  Install to Device Over USB
                 </h2>
                 <p className="home-card-desc">
                   Use the browser installer to bootstrap the shared installer and
@@ -63,7 +63,7 @@ export default function SetupPage() {
 
               <div className="app-inline-actions">
                 <a href="/install/" className="hero-cta hero-cta--secondary app-button">
-                  Open installer
+                  Open Installer
                 </a>
               </div>
             </section>
@@ -71,7 +71,7 @@ export default function SetupPage() {
 
           <section className="callout app-flow app-flow--sm" aria-labelledby="setup-requirements-title">
             <h2 id="setup-requirements-title" className="press-kit-section-title">
-              Installer requirements
+              Installer Requirements
             </h2>
             <p>
               The installer is intended for Chromium-family browsers in a secure context

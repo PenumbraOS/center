@@ -56,7 +56,7 @@ export function InstallStatusCard({
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-status-title">
       <h2 id="install-status-title" className="app-panel-title">
-        Session status
+        Session Status
       </h2>
 
       <dl className="app-kv app-kv--compact">

@@ -23,18 +23,18 @@ function getResultTone(state: InstallControllerState) {
 
 function getResultTitle(state: InstallControllerState) {
   if (state.stage === "error") {
-    return "Action failed";
+    return "Action Failed";
   }
 
   if (!state.lastOperationResult) {
-    return "Latest result";
+    return "Latest Result";
   }
 
   if (state.lastOperationResult.kind === "install") {
-    return state.lastOperationResult.result.success ? "Install finished" : "Install failed";
+    return state.lastOperationResult.result.success ? "Install Finished" : "Install Failed";
   }
 
-  return state.lastOperationResult.result.success ? "Uninstall finished" : "Uninstall failed";
+  return state.lastOperationResult.result.success ? "Uninstall Finished" : "Uninstall Failed";
 }
 
 function getResultCopy(state: InstallControllerState) {
@@ -170,12 +170,12 @@ export function InstallResultCard({
       {copy ? <div className={`app-notice app-notice--${tone}`}>{copy}</div> : null}
 
       {failureSummary ? (
-        <section className="app-subpanel app-flow app-flow--sm" aria-label="Failure diagnostics summary">
+        <section className="app-subpanel app-flow app-flow--sm" aria-label="Failure Diagnostics Summary">
           <div className="app-flow app-flow--sm">
             <div>
-              <div className="home-card-subtitle">Failure diagnostics</div>
+              <div className="home-card-subtitle">Failure Diagnostics</div>
               <p className="app-panel-copy">
-                Failed during {failureSummary.failedPhase}. Use Recheck to refresh the live device state, or Rollback install to restore the previous system packages.
+                Failed during {failureSummary.failedPhase}. Use Recheck to refresh the live device state, or Rollback Install to restore the previous system packages.
               </p>
             </div>
 
@@ -206,7 +206,7 @@ export function InstallResultCard({
 
             {failureSummary.problematicPackages.length > 0 ? (
               <div className="app-flow app-flow--sm">
-                <div className="home-card-subtitle">Managed package mismatches</div>
+                <div className="home-card-subtitle">Managed Package Mismatches</div>
                 <ul className="app-list app-list--plain app-result-diagnostics-list">
                   {failureSummary.problematicPackages.map((pkg) => (
                     <li key={pkg.role} className="app-subpanel app-subpanel--dense app-flow app-flow--sm">

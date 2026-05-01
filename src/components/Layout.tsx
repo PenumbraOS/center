@@ -27,7 +27,7 @@ function ConnectingOverlay() {
       <div className="app-overlay-card">
         <div className="app-spinner" />
         <div>
-          <div className="app-overlay-title">Reconnecting portal</div>
+          <div className="app-overlay-title">Reconnecting Portal</div>
           <p className="app-overlay-copy">
             Connecting to the Pin server and restoring your session.
           </p>

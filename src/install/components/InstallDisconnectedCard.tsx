@@ -42,7 +42,7 @@ export function InstallDisconnectedCard({
   return (
     <section className="app-info-card app-flow app-flow--sm" aria-labelledby="install-connect-title">
       <h2 id="install-connect-title" className="app-panel-title">
-        Connect a device
+        Connect a Device
       </h2>
       <p className="app-page-copy">{getConnectCopy(state)}</p>
 

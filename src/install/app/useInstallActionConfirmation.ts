@@ -49,7 +49,7 @@ function getPrimaryActionLabel(state: InstallControllerState): string {
 function createRiskRequirement(): InstallConfirmationRequirement {
   return {
     kind: "risk",
-    title: "Risk acknowledgement",
+    title: "Risk Acknowledgement",
     description:
       "This action will modify system packages on the connected device. Continue only if you want the installer to change device state.",
   };
@@ -58,7 +58,7 @@ function createRiskRequirement(): InstallConfirmationRequirement {
 function createUnsupportedDeviceRequirement(): InstallConfirmationRequirement {
   return {
     kind: "unsupported-device",
-    title: "Unsupported device",
+    title: "Unsupported Device",
     description:
       "This device does not match the recognized Humane Ai Pin identity check. You can still continue, but install results are not guaranteed.",
   };
@@ -67,7 +67,7 @@ function createUnsupportedDeviceRequirement(): InstallConfirmationRequirement {
 function createRollbackRequirement(): InstallConfirmationRequirement {
   return {
     kind: "rollback",
-    title: "Confirm rollback",
+    title: "Confirm Rollback",
     description:
       "Rollback removes the managed PenumbraOS packages and re-enables the configured stock/system packages when possible.",
   };
@@ -76,7 +76,7 @@ function createRollbackRequirement(): InstallConfirmationRequirement {
 function createUninstallRequirement(): InstallConfirmationRequirement {
   return {
     kind: "uninstall",
-    title: "Confirm uninstall",
+    title: "Confirm Uninstall",
     description:
       "Uninstall removes the managed PenumbraOS packages and re-enables the configured stock/system packages when possible.",
   };
@@ -85,7 +85,7 @@ function createUninstallRequirement(): InstallConfirmationRequirement {
 function createNewerThanTargetRequirement(): InstallConfirmationRequirement {
   return {
     kind: "newer-than-target",
-    title: "Installed packages are newer than target",
+    title: "Installed Packages Are Newer Than Target",
     description:
       "One or more managed packages are newer than the currently resolved release target. Continuing will reinstall the device to the selected target versions.",
   };
@@ -131,9 +131,9 @@ function createDialogForAction(options: {
     title:
       requirements.length === 1 && requirements[0].kind === "uninstall"
         ? options.action === "rollback"
-          ? "Confirm rollback"
-          : "Confirm uninstall"
-        : "Review before continuing",
+          ? "Confirm Rollback"
+          : "Confirm Uninstall"
+        : "Review Before Continuing",
     body:
       options.action === "primary"
         ? `Review the following before continuing with ${primaryActionLabel}.`
