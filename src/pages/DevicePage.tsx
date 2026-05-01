@@ -29,13 +29,18 @@ export default function DevicePage() {
       </section>
 
       <section className="app-page-content">
-        <div className="container app-form-grid app-form-grid--two" style={{ maxWidth: "56rem" }}>
+        <div
+          className="container app-form-grid app-form-grid--two"
+          style={{ maxWidth: "56rem" }}
+        >
           <section className="app-info-card app-flow app-flow--sm">
             <h2 className="app-panel-title">Info</h2>
             <dl className="app-kv">
               <div className="app-kv-item">
                 <dt>Display Name</dt>
-                <dd className="app-value">{device?.display_name ?? "Unknown"}</dd>
+                <dd className="app-value">
+                  {device?.display_name ?? "Unknown"}
+                </dd>
               </div>
               <div className="app-kv-item">
                 <dt>Server Address</dt>
@@ -98,13 +103,17 @@ export default function DevicePage() {
             </dl>
           </section>
 
-          <section className="app-info-card app-flow app-flow--sm" style={{ gridColumn: "1 / -1" }}>
+          <section
+            className="app-info-card app-flow app-flow--sm"
+            style={{ gridColumn: "1 / -1" }}
+          >
             <h2 className="app-panel-title">Connection</h2>
-            <p className="app-panel-copy">
-              Disconnect from this Pin server to connect to a different one.
-            </p>
+            <p className="app-panel-copy">Disconnect from Ai Pin.</p>
             <div className="app-inline-actions">
-              <button onClick={disconnect} className="app-button app-button--ghost">
+              <button
+                onClick={disconnect}
+                className="app-button app-button--ghost"
+              >
                 Disconnect
               </button>
             </div>

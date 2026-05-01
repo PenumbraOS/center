@@ -1190,6 +1190,10 @@ button {
   text-decoration: none;
 }
 
+.app-button.back-link {
+  background-color: unset;
+}
+
 button.hero-cta,
 button.download-btn,
 button.app-button--danger,

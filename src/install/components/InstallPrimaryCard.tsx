@@ -154,7 +154,7 @@ export function InstallPrimaryCard({
         {viewModel.showHero ? (
           <div className="install-stage__hero" aria-hidden="true">
             <img
-              src="/install/ai-pin.png"
+              src="/install/ai-pin.webp"
               alt=""
               className="install-stage__hero-image"
             />

@@ -38,7 +38,9 @@ export default function ConnectPage() {
       logError("connect-page", "Manual connect failed", err, {
         url,
       });
-      setError("Could not connect. Check the address and make sure the server is running.");
+      setError(
+        "Could not connect. Check the address and make sure you have enabled LAN access in your browser.",
+      );
     }
   }
 
@@ -90,9 +92,9 @@ export default function ConnectPage() {
 
             <div className="callout app-flow app-flow--sm">
               <p>
-                Your browser may ask for permission to access your local network if you
-                connect to a LAN-hosted server. This is required for the portal to
-                communicate with your Pin server.
+                Your browser may ask for permission to access your local network
+                if you connect to a LAN-hosted server. This is required for the
+                portal to communicate with your Pin server.
               </p>
             </div>
           </div>
