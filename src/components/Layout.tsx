@@ -40,7 +40,7 @@ function ConnectingOverlay() {
 const PUBLIC_ROUTES = new Set(["/", "/connect"]);
 
 export default function Layout() {
-  const { status, device } = usePin();
+  const { status } = usePin();
   const navigate = useNavigate();
   const location = useLocation();
   const connected = status === "connected";

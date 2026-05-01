@@ -32,7 +32,7 @@ function LogoMark() {
     <>
       <img
         className="logo-icon"
-        src="/logo.png"
+        src="/img/logo.png"
         width={28}
         height={28}
         alt=""

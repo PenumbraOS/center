@@ -118,15 +118,17 @@ button {
   inset: 0;
   z-index: 200;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: var(--space-xl) 0;
+  overflow-y: auto;
   background: rgba(15, 15, 15, 0.82);
   backdrop-filter: blur(8px);
 }
 
 .app-overlay-card {
   width: min(100%, 420px);
-  margin: 0 var(--space-lg);
+  margin: auto var(--space-lg);
   padding: var(--space-xl);
   background: var(--color-umbra);
   border: 1px solid var(--color-border-light);
@@ -1128,6 +1130,99 @@ button {
 
 .install-dialog__button--primary:hover {
   background: var(--color-beam-dim);
+}
+
+/* ---------- Info dialog (e.g. connection help) ---------- */
+
+.install-info-dialog {
+  width: min(100%, 480px);
+  text-align: left;
+}
+
+.install-info-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.install-info-dialog__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: calc(var(--space-xs) * -1) calc(var(--space-xs) * -1) 0 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.install-info-dialog__close:hover {
+  background: var(--color-surface);
+  color: var(--color-text-heading);
+  border-color: var(--color-border-light);
+}
+
+.install-info-dialog__close:focus-visible {
+  outline: 2px solid var(--color-beam);
+  outline-offset: 2px;
+}
+
+.install-info-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.install-info-dialog__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.install-info-dialog__link-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-eclipse);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.install-info-dialog__link-item:hover {
+  border-color: var(--color-beam);
+  background: var(--color-surface);
+}
+
+.install-info-dialog__link {
+  color: var(--color-text-heading);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.install-info-dialog__link:hover,
+.install-info-dialog__link:focus-visible {
+  color: var(--color-beam);
+  text-decoration: underline;
+}
+
+.install-info-dialog__link-description {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .app-list {

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import type { InstallController } from "../app/useInstallController";
 import {
   derivePrimaryCardViewModel,
   type PrimaryCardActionViewModel,
 } from "../presentation/primaryCardViewModel";
+import { ConnectionHelpModal } from "./ConnectionHelpModal";
 
 function runAction(options: {
   action: PrimaryCardActionViewModel;
@@ -147,6 +149,8 @@ export function InstallPrimaryCard({
     controller.state,
     controller.commands,
   );
+  const [helpOpen, setHelpOpen] = useState(false);
+  const showConnectionHelp = viewModel.primaryAction?.key === "connect";
 
   return (
     <section className="install-stage" aria-labelledby="install-stage-title">
@@ -252,7 +256,7 @@ export function InstallPrimaryCard({
         </div>
 
         <div className="install-stage__links-slot">
-          {viewModel.secondaryActions.length > 0 ? (
+          {viewModel.secondaryActions.length > 0 || showConnectionHelp ? (
             <nav className="install-stage__links" aria-label="More actions">
               {viewModel.secondaryActions.map((action) => (
                 <span key={action.key} className="install-stage__link-item">
@@ -265,10 +269,26 @@ export function InstallPrimaryCard({
                   />
                 </span>
               ))}
+              {showConnectionHelp ? (
+                <span className="install-stage__link-item">
+                  <button
+                    type="button"
+                    className="install-stage__link"
+                    onClick={() => setHelpOpen(true)}
+                  >
+                    Connection help
+                  </button>
+                </span>
+              ) : null}
             </nav>
           ) : null}
         </div>
       </footer>
+
+      <ConnectionHelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      />
     </section>
   );
 }

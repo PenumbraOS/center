@@ -31,34 +31,56 @@ async function main() {
 
   await mkdir(path.join(distHugoDir, "install"), { recursive: true });
   await mkdir(path.join(distHugoDir, "center"), { recursive: true });
-  await cp(path.join(distInstallDir, "install.html"), path.join(distHugoDir, "install", "index.html"), {
-    force: true,
-  });
-  await cp(path.join(distInstallDir, "assets"), path.join(distHugoDir, "install", "assets"), {
-    recursive: true,
-  });
-  await cp(path.join(distInstallDir, "favicon.svg"), path.join(distHugoDir, "install", "favicon.svg"), {
-    force: true,
-  });
-  await cp(path.join(distInstallDir, "icons.svg"), path.join(distHugoDir, "install", "icons.svg"), {
-    force: true,
-  });
-  await cp(path.join(distInstallDir, "install"), path.join(distHugoDir, "install"), {
-    recursive: true,
-    force: true,
-  });
-  await cp(path.join(distCenterDir, "center.html"), path.join(distHugoDir, "center", "index.html"), {
-    force: true,
-  });
-  await cp(path.join(distCenterDir, "assets"), path.join(distHugoDir, "center", "assets"), {
-    recursive: true,
-  });
-  await cp(path.join(distCenterDir, "favicon.svg"), path.join(distHugoDir, "center", "favicon.svg"), {
-    force: true,
-  });
-  await cp(path.join(distCenterDir, "icons.svg"), path.join(distHugoDir, "center", "icons.svg"), {
-    force: true,
-  });
+  await cp(
+    path.join(distInstallDir, "install.html"),
+    path.join(distHugoDir, "install", "index.html"),
+    {
+      force: true,
+    },
+  );
+  await cp(
+    path.join(distInstallDir, "assets"),
+    path.join(distHugoDir, "install", "assets"),
+    {
+      recursive: true,
+    },
+  );
+  await cp(
+    path.join(distInstallDir, "icons.svg"),
+    path.join(distHugoDir, "install", "icons.svg"),
+    {
+      force: true,
+    },
+  );
+  await cp(
+    path.join(distInstallDir, "install"),
+    path.join(distHugoDir, "install"),
+    {
+      recursive: true,
+      force: true,
+    },
+  );
+  await cp(
+    path.join(distCenterDir, "center.html"),
+    path.join(distHugoDir, "center", "index.html"),
+    {
+      force: true,
+    },
+  );
+  await cp(
+    path.join(distCenterDir, "assets"),
+    path.join(distHugoDir, "center", "assets"),
+    {
+      recursive: true,
+    },
+  );
+  await cp(
+    path.join(distCenterDir, "icons.svg"),
+    path.join(distHugoDir, "center", "icons.svg"),
+    {
+      force: true,
+    },
+  );
   await cp(publicInstallerDir, path.join(distHugoDir, "installer"), {
     recursive: true,
   });
