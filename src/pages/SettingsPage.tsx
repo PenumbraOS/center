@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePin } from "../hooks";
 import type { Settings, UpdateSettingsRequest } from "../api";
 import SecretInput from "../components/SecretInput";
+import UnsavedChangesPrompt from "../components/UnsavedChangesPrompt";
 import { logError, logInfo } from "../logging";
 
 const LLM_PROVIDERS = [
@@ -45,6 +46,11 @@ export default function SettingsPage() {
   function handleProviderChange(next: string) {
     setProvider(next);
     setApiKey("");
+    if (next === "echo") {
+      setModel("");
+    } else if (settings) {
+      setModel(next === settings.llm.provider ? settings.llm.model : "");
+    }
     if (settings) {
       setBaseUrl(
         next === settings.llm.provider ? (settings.llm.base_url ?? "") : "",
@@ -161,6 +167,7 @@ export default function SettingsPage() {
 
   const isDirty = buildRequest() !== null;
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
+  const showModelAndKey = provider !== "echo";
 
   return (
     <>
@@ -177,7 +184,7 @@ export default function SettingsPage() {
 
       <section className="app-page-content">
         <div className="container app-flow" style={{ maxWidth: "56rem" }}>
-          <div className="app-button-row app-button-row--between">
+          <div className="app-button-row app-button-row--flex-end">
             <div className="app-inline-actions">
               {saveStatus === "saving" && (
                 <span className="app-save-status app-save-status--saving">
@@ -232,25 +239,31 @@ export default function SettingsPage() {
                   </select>
                 </label>
 
-                <label className="app-form-field">
-                  <span className="app-form-label">Model</span>
-                  <input
-                    type="text"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    placeholder="e.g. gemini-2.5-flash"
-                    className="app-form-input"
-                  />
-                </label>
+                {showModelAndKey && (
+                  <label className="app-form-field">
+                    <span className="app-form-label">Model ID</span>
+                    <input
+                      type="text"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      placeholder="gemini-2.5-flash"
+                      className="app-form-input"
+                    />
+                  </label>
+                )}
 
-                <div className="app-form-field">
-                  <span className="app-form-label">API Key</span>
-                  <SecretInput
-                    value={apiKey}
-                    onChange={setApiKey}
-                    hasExisting={isOriginalProvider && settings.llm.has_api_key}
-                  />
-                </div>
+                {showModelAndKey && (
+                  <div className="app-form-field">
+                    <span className="app-form-label">API Key</span>
+                    <SecretInput
+                      value={apiKey}
+                      onChange={setApiKey}
+                      hasExisting={
+                        isOriginalProvider && settings.llm.has_api_key
+                      }
+                    />
+                  </div>
+                )}
 
                 {showBaseUrl && (
                   <label className="app-form-field">
@@ -369,6 +382,8 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      <UnsavedChangesPrompt when={isDirty} />
     </>
   );
 }

@@ -1,4 +1,8 @@
-import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import {
+  Navigate,
+  RouterProvider,
+  createHashRouter,
+} from "react-router-dom";
 import Layout from "./components/Layout";
 import { PinProvider, usePin } from "./hooks";
 import ConnectPage from "./pages/ConnectPage";
@@ -18,28 +22,29 @@ function CenterRootRedirect() {
   return <SetupPage />;
 }
 
-function CenterAppRoutes() {
+function ProvidersLayout() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<CenterRootRedirect />} />
-        <Route path="/connect" element={<ConnectPage />} />
-        <Route path="/gallery" element={<GalleryPage />} />
-        <Route path="/gallery/:uuid" element={<MemoryDetailPage />} />
-        <Route path="/device" element={<DevicePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <PinProvider>
+      <Layout />
+    </PinProvider>
   );
 }
 
+const router = createHashRouter([
+  {
+    element: <ProvidersLayout />,
+    children: [
+      { path: "/", element: <CenterRootRedirect /> },
+      { path: "/connect", element: <ConnectPage /> },
+      { path: "/gallery", element: <GalleryPage /> },
+      { path: "/gallery/:uuid", element: <MemoryDetailPage /> },
+      { path: "/device", element: <DevicePage /> },
+      { path: "/settings", element: <SettingsPage /> },
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
+  },
+]);
+
 export default function CenterApp() {
-  return (
-    <HashRouter>
-      <PinProvider>
-        <CenterAppRoutes />
-      </PinProvider>
-    </HashRouter>
-  );
+  return <RouterProvider router={router} />;
 }

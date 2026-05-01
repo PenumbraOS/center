@@ -81,11 +81,6 @@ export default function Layout() {
         nav={connected ? <SiteNav /> : null}
         meta={
           <>
-            {connected && device && (
-              <span className="app-device-name" title={device.display_name}>
-                {device.display_name}
-              </span>
-            )}
             <StatusIndicator status={status} />
           </>
         }

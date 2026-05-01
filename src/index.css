@@ -63,16 +63,9 @@ button {
 .app-header-meta {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   color: var(--color-text-secondary);
   font-size: 0.8rem;
-}
-
-.app-device-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .app-status-indicator {
@@ -1184,6 +1177,10 @@ button {
   justify-content: space-between;
 }
 
+.app-button-row--flex-end {
+  justify-content: flex-end;
+}
+
 .app-button {
   border: 0;
   cursor: pointer;
@@ -1868,10 +1865,6 @@ button.app-button--ghost {
   .app-site-nav {
     flex-wrap: wrap;
     gap: var(--space-sm);
-  }
-
-  .app-device-name {
-    max-width: 120px;
   }
 
   .app-page-title {
