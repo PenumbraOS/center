@@ -379,7 +379,7 @@ export default function SettingsPage() {
                     target="_blank"
                     rel="noopener"
                   >
-                    Install Options
+                    Open Installer
                   </a>
                   <button
                     onClick={handleDisconnect}

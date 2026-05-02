@@ -24,7 +24,7 @@ export default function SetupPage() {
             >
               <div className="app-flow app-flow--sm">
                 <h2 id="setup-connect-title" className="home-card-title">
-                  Connect to PenumbraOS
+                  Connect
                 </h2>
                 <p className="home-card-desc">
                   View memories on Ai Pin, manage settings, and more by
@@ -51,7 +51,7 @@ export default function SetupPage() {
             >
               <div className="app-flow app-flow--sm">
                 <h2 id="setup-install-title" className="home-card-title">
-                  Install to Ai Pin
+                  Install
                 </h2>
                 <p className="home-card-desc">
                   Use the interactive browser installer to set up or modify an

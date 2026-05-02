@@ -1,5 +1,6 @@
 import type {
   DeviceInfo,
+  HealthInfo,
   MemoryRecord,
   Settings,
   UpdateSettingsRequest,
@@ -37,7 +38,7 @@ export class PinClient {
   }
 
   health() {
-    return this.request<{ status: string }>("/api/health");
+    return this.request<HealthInfo>("/api/health");
   }
 
   listMemories() {

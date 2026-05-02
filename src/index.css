@@ -396,6 +396,60 @@ button {
   align-items: center;
 }
 
+.connect-page-panel-title {
+  margin: 0;
+}
+
+.connect-discovery-loading,
+.connect-discovery-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.connect-discovery-loading__row,
+.connect-discovery-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.connect-discovery-loading__row {
+  color: var(--color-text-secondary);
+  justify-content: flex-start;
+}
+
+.connect-discovery-row + .connect-discovery-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.connect-discovery-row__content {
+  min-width: 0;
+}
+
+.connect-discovery-row__name {
+  color: var(--color-text-heading);
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-discovery-row__meta {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-discovery-row__action {
+  flex-shrink: 0;
+}
+
 /* ============================================================
    Installer — clean, sleek, minimal
    Uses --color-* / --space-* / --radius-* tokens consistently.

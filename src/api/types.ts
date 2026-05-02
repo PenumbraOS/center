@@ -17,6 +17,14 @@ export interface Location {
   full_address?: string;
 }
 
+export interface HealthInfo {
+  status: string;
+  /** Display name. */
+  name?: string;
+  /** Server software version. */
+  version?: string;
+}
+
 export interface DeviceInfo {
   display_name: string;
   server_port: number;
