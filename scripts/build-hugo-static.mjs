@@ -12,7 +12,6 @@ const repoRoot = path.resolve(__dirname, "..");
 const distInstallDir = path.join(repoRoot, "dist-install");
 const distCenterDir = path.join(repoRoot, "dist-center");
 const distHugoDir = path.join(repoRoot, "dist-hugo");
-const publicInstallerDir = path.join(repoRoot, "public", "installer");
 
 async function run(command, args) {
   await execFileAsync(command, args, {
@@ -81,9 +80,6 @@ async function main() {
       force: true,
     },
   );
-  await cp(publicInstallerDir, path.join(distHugoDir, "installer"), {
-    recursive: true,
-  });
 }
 
 main().catch((error) => {
