@@ -29,13 +29,7 @@ export default function InstallAppV1() {
   });
 
   return (
-    <SiteChrome
-      meta={
-        <a href="/center/" className="nav-link nav-link--pill">
-          Center
-        </a>
-      }
-    >
+    <SiteChrome title="Center">
       <div className="install-page">
         <section className="install-page__section">
           <div className="install-page__column">

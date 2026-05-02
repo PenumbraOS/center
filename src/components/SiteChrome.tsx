@@ -6,6 +6,8 @@ interface SiteChromeProps {
    * site (Hugo root) from any embedded SPA.
    */
   readonly logoHref?: string;
+  /** Product title shown beside the logo. */
+  readonly title?: ReactNode;
   /** Primary nav slot (between logo and right meta). */
   readonly nav?: ReactNode;
   /** Right-side meta slot (status indicator, device name, etc.). */
@@ -45,6 +47,7 @@ function LogoMark() {
 
 export default function SiteChrome({
   logoHref = "/",
+  title,
   nav,
   meta,
   children,
@@ -56,6 +59,12 @@ export default function SiteChrome({
           <a href={logoHref} className="site-logo">
             <LogoMark />
           </a>
+          {title && (
+            <>
+              <span>|</span>
+              <span className="site-title">{title}</span>
+            </>
+          )}
           {nav}
           <div className="app-header-right">
             {meta && <div className="app-header-meta">{meta}</div>}

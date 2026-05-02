@@ -79,6 +79,7 @@ export default function Layout() {
   return (
     <>
       <SiteChrome
+        title="Center"
         meta={
           <>
             <StatusIndicator status={status} />
