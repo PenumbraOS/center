@@ -31,6 +31,10 @@ export default function SettingsPage() {
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [logDownloadError, setLogDownloadError] = useState<string | null>(null);
+  const [downloadingLogKind, setDownloadingLogKind] = useState<
+    "server" | "logcat" | null
+  >(null);
   const [allowDisconnectNavigation, setAllowDisconnectNavigation] =
     useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -164,6 +168,58 @@ export default function SettingsPage() {
       });
       setSaveError(message);
       setSaveStatus("error");
+    }
+  }
+
+  function downloadTextFile(fileName: string, text: string) {
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function handleDownloadLogs(kind: "server" | "logcat") {
+    if (!client || downloadingLogKind) return;
+
+    setLogDownloadError(null);
+    setDownloadingLogKind(kind);
+
+    try {
+      logInfo("settings-page", "Downloading logs", {
+        baseUrl: client.baseUrl,
+        kind,
+      });
+      const result = await client.fetchLogs(kind);
+      if (!result.available) {
+        setLogDownloadError(result.text || `Failed to download ${kind} logs`);
+        return;
+      }
+
+      downloadTextFile(
+        kind === "server" ? "humane-server.log" : "android-logcat.log",
+        result.text,
+      );
+      logInfo("settings-page", "Logs downloaded", {
+        baseUrl: client.baseUrl,
+        kind,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `Failed to download ${kind} logs`;
+      logError("settings-page", "Failed to download logs", error, {
+        baseUrl: client?.baseUrl,
+        kind,
+      });
+      setLogDownloadError(message);
+    } finally {
+      setDownloadingLogKind(null);
     }
   }
 
@@ -337,7 +393,7 @@ export default function SettingsPage() {
               </section>
 
               <section className="app-form-card">
-                <h2>Weather</h2>
+                <h2>Services</h2>
 
                 <div className="app-form-field">
                   <span className="app-form-label">PirateWeather API Key</span>
@@ -349,23 +405,36 @@ export default function SettingsPage() {
                 </div>
               </section>
 
-              <section className="app-form-card">
-                <h2>
-                  Storage <span className="app-readonly-note">(read-only)</span>
-                </h2>
-                <dl className="app-kv">
-                  <div className="app-kv-item">
-                    <dt>Media Directory</dt>
-                    <dd className="app-mono">{settings.storage.media_dir}</dd>
-                  </div>
-                  <div className="app-kv-item">
-                    <dt>Database Path</dt>
-                    <dd className="app-mono">{settings.storage.db_path}</dd>
-                  </div>
-                </dl>
+              <section className="app-form-card app-flow--sm">
+                <h2>Logs</h2>
+                <div className="app-inline-actions">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadLogs("server")}
+                    disabled={downloadingLogKind !== null}
+                    className="app-button app-button--ghost"
+                  >
+                    {downloadingLogKind === "server"
+                      ? "Downloading Server Logs..."
+                      : "Download Server Logs"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadLogs("logcat")}
+                    disabled={downloadingLogKind !== null}
+                    className="app-button app-button--ghost"
+                  >
+                    {downloadingLogKind === "logcat"
+                      ? "Downloading Logcat..."
+                      : "Download Logcat"}
+                  </button>
+                </div>
+                {logDownloadError && (
+                  <p className="app-form-error">{logDownloadError}</p>
+                )}
               </section>
 
-              <section className="app-form-card">
+              <section className="app-form-card app-flow--sm">
                 <h2>Troubleshooting</h2>
                 <p className="home-card-desc">
                   If you're having problems, you can uninstall and reinstall

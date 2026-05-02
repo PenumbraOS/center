@@ -37,6 +37,39 @@ export class PinClient {
     return res.json() as Promise<T>;
   }
 
+  async fetchLogs(
+    kind: "server" | "logcat",
+    options: { lines?: number; all?: boolean } = {},
+  ): Promise<{ available: boolean; text: string }> {
+    const params = new URLSearchParams();
+    if (options.lines && options.lines > 0) {
+      params.set("lines", String(options.lines));
+    }
+    if (kind === "server" && options.all === false) {
+      params.set("all", "false");
+    }
+
+    const qs = params.toString();
+    const res = await fetch(
+      `${this.baseUrl}/api/logs/${kind}${qs ? `?${qs}` : ""}`,
+      {
+        headers: { Accept: "text/plain" },
+        // @ts-expect-error -- targetAddressSpace is not yet in TS lib types
+        targetAddressSpace: "local",
+      },
+    );
+    const text = await res.text();
+
+    if (res.status === 503) {
+      return { available: false, text };
+    }
+    if (!res.ok) {
+      throw new PinApiError(res.status, text);
+    }
+
+    return { available: true, text };
+  }
+
   health() {
     return this.request<HealthInfo>("/api/health");
   }

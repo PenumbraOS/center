@@ -1441,6 +1441,7 @@ button.app-button--ghost {
   line-height: 1.65;
 }
 
+
 .app-notice--info {
   background: var(--color-beam-subtle);
   border: 1px solid rgba(0, 255, 224, 0.22);
