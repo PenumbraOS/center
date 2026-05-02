@@ -1143,6 +1143,18 @@ button {
   color: var(--color-text-heading);
 }
 
+.install-dialog__button--danger {
+  background: rgba(217, 64, 64, 0.1);
+  color: #ffc0c0;
+  border-color: rgba(217, 64, 64, 0.35);
+}
+
+.install-dialog__button--danger:hover {
+  background: rgba(217, 64, 64, 0.16);
+  border-color: rgba(217, 64, 64, 0.6);
+  color: #fff;
+}
+
 .install-dialog__button--primary {
   background: var(--color-beam);
   color: #000;

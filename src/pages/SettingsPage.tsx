@@ -16,7 +16,7 @@ const LLM_PROVIDERS = [
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export default function SettingsPage() {
-  const { client } = usePin();
+  const { client, disconnect } = usePin();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -31,6 +31,8 @@ export default function SettingsPage() {
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [allowDisconnectNavigation, setAllowDisconnectNavigation] =
+    useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const populateForm = useCallback((s: Settings) => {
@@ -165,6 +167,11 @@ export default function SettingsPage() {
     }
   }
 
+  function handleDisconnect() {
+    setAllowDisconnectNavigation(true);
+    disconnect();
+  }
+
   const isDirty = buildRequest() !== null;
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
   const showModelAndKey = provider !== "echo";
@@ -176,14 +183,14 @@ export default function SettingsPage() {
           <div className="app-page-intro">
             <h1 className="app-page-title">Settings</h1>
             <p className="app-page-copy">
-              Customize your PenumbraoOS experience.
+              Customize your PenumbraOS experience.
             </p>
           </div>
         </div>
       </section>
 
       <section className="app-page-content">
-        <div className="container app-flow" style={{ maxWidth: "56rem" }}>
+        <div className="container app-flow" style={{ maxWidth: "44rem" }}>
           <div className="app-button-row app-button-row--flex-end">
             <div className="app-inline-actions">
               {saveStatus === "saving" && (
@@ -220,7 +227,57 @@ export default function SettingsPage() {
           {loadError && <p className="app-form-error">{loadError}</p>}
 
           {settings && (
-            <div className="app-form-grid app-form-grid--two">
+            <div className="app-flow">
+              <section className="app-form-card">
+                <h2>Server</h2>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Display Name</span>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Penumbra"
+                    className="app-form-input"
+                  />
+                </label>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">System Prompt</span>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={4}
+                    className="app-form-textarea"
+                  />
+                </label>
+
+                <div className="app-kv app-kv--compact">
+                  <div className="app-kv-item">
+                    <dt>Port</dt>
+                    <dd className="app-value">
+                      {settings.server.port}
+                      <span className="app-readonly-note">
+                        {" "}
+                        (requires restart)
+                      </span>
+                    </dd>
+                  </div>
+                  {settings.server.public_addr && (
+                    <div className="app-kv-item">
+                      <dt>Public Address</dt>
+                      <dd className="app-mono">
+                        {settings.server.public_addr}
+                        <span className="app-readonly-note">
+                          {" "}
+                          (requires restart)
+                        </span>
+                      </dd>
+                    </div>
+                  )}
+                </div>
+              </section>
+
               <section className="app-form-card">
                 <h2>LLM</h2>
 
@@ -280,56 +337,6 @@ export default function SettingsPage() {
               </section>
 
               <section className="app-form-card">
-                <h2>Server</h2>
-
-                <label className="app-form-field">
-                  <span className="app-form-label">Display Name</span>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Penumbra"
-                    className="app-form-input"
-                  />
-                </label>
-
-                <label className="app-form-field">
-                  <span className="app-form-label">System Prompt</span>
-                  <textarea
-                    value={systemPrompt}
-                    onChange={(e) => setSystemPrompt(e.target.value)}
-                    rows={4}
-                    className="app-form-textarea"
-                  />
-                </label>
-
-                <div className="app-kv app-kv--compact">
-                  <div className="app-kv-item">
-                    <dt>Port</dt>
-                    <dd className="app-value">
-                      {settings.server.port}
-                      <span className="app-readonly-note">
-                        {" "}
-                        (requires restart)
-                      </span>
-                    </dd>
-                  </div>
-                  {settings.server.public_addr && (
-                    <div className="app-kv-item">
-                      <dt>Public Address</dt>
-                      <dd className="app-mono">
-                        {settings.server.public_addr}
-                        <span className="app-readonly-note">
-                          {" "}
-                          (requires restart)
-                        </span>
-                      </dd>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="app-form-card">
                 <h2>Weather</h2>
 
                 <div className="app-form-field">
@@ -362,20 +369,24 @@ export default function SettingsPage() {
                 <h2>Troubleshooting</h2>
                 <p className="home-card-desc">
                   If you're having problems, you can uninstall and reinstall
-                  PenumbraOS from the Install page.
+                  PenumbraOS from the Install page. You can also disconnect this
+                  browser from the Pin and reconnect later.
                 </p>
-                <div
-                  className="app-inline-actions"
-                  style={{ justifyContent: "center" }}
-                >
+                <div className="app-inline-actions">
                   <a
-                    className="install-stage__link"
+                    className="app-button app-button--ghost"
                     href="/install/"
                     target="_blank"
                     rel="noopener"
                   >
                     Install Options
                   </a>
+                  <button
+                    onClick={handleDisconnect}
+                    className="app-button app-button--danger"
+                  >
+                    Disconnect
+                  </button>
                 </div>
               </section>
             </div>
@@ -383,7 +394,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <UnsavedChangesPrompt when={isDirty} />
+      <UnsavedChangesPrompt when={isDirty && !allowDisconnectNavigation} />
     </>
   );
 }

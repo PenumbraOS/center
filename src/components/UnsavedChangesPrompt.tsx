@@ -76,7 +76,7 @@ export default function UnsavedChangesPrompt({
         <div className="install-dialog__actions">
           <button
             type="button"
-            className="install-dialog__button install-dialog__button--ghost"
+            className="install-dialog__button install-dialog__button--danger"
             onClick={() => blocker.proceed?.()}
           >
             {discardLabel}
