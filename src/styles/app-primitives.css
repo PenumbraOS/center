@@ -177,7 +177,6 @@ img {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--space-lg);
-  margin-top: var(--space-xl);
   margin-bottom: var(--space-xl);
 }
 
@@ -190,10 +189,6 @@ img {
   transition: border-color var(--transition), background var(--transition);
 }
 
-.home-card:hover {
-  border-color: var(--color-beam);
-  background: var(--color-surface);
-}
 
 .home-card-title {
   font-size: 1.125rem;

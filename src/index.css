@@ -198,11 +198,11 @@ button {
 .app-page-header .container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
 }
 
 .app-page-header .back-link {
   width: fit-content;
+  margin-top: -24px;
 }
 
 .app-page-title {
@@ -227,10 +227,6 @@ button {
 
 .app-page-content .container {
   min-width: 0;
-}
-
-.app-page-intro {
-  margin-bottom: var(--space-xl);
 }
 
 .app-grid,
@@ -443,8 +439,7 @@ button {
 .install-page__section {
   width: 100%;
   padding: var(--space-2xl) var(--space-xl);
-  /* Constant top offset so expanding diagnostics never reflow the stage card. */
-  padding-top: clamp(var(--space-2xl), 8vh, 96px);
+  padding-top: var(--space-2xl);
 }
 
 .install-page__column {

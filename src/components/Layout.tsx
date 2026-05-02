@@ -16,9 +16,13 @@ function StatusIndicator({
       title={status}
     >
       <span className="app-status-indicator__dot" />
-      <span>{status}</span>
+      <span>{statusToMessage(status)}</span>
     </span>
   );
+}
+
+function statusToMessage(status: string): string {
+  return String(status).charAt(0).toUpperCase() + String(status).slice(1);
 }
 
 function ConnectingOverlay() {
