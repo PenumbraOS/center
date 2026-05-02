@@ -86,7 +86,7 @@ export default function SiteChrome({
       <footer className="site-footer">
         <div className="footer-inner">
           <div className="footer-info">
-            <p className="footer-note app-footer-note">
+            <p className="footer-note">
               PenumbraOS is not affiliated with Humane Inc. or HP Inc. The Ai
               Pin trademark and archived content remains property of HP.
             </p>
