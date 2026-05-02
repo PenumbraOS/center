@@ -10,6 +10,8 @@ export const MANAGED_PACKAGES = {
 
 export const PACKAGE_METADATA_POLL_INTERVAL_MS = 3000;
 export const PACKAGE_METADATA_POLL_TIMEOUT_MS = 120000;
+export const DEFAULT_HOME_ACTIVITY =
+  "humane.experience.systemnavigation/humaneinternal.system.ipc.HumaneExperienceActivity";
 
 export interface InstalledPackageMetadata {
   readonly packageName: string;
@@ -141,4 +143,12 @@ export async function enablePackageForUser(
     success: result.exitCode === 0,
     message: result.stderr.trim() || result.stdout.trim() || `enable completed for ${packageName}`,
   };
+}
+
+export async function setHomeActivity(
+  transport: AdbSessionTransport,
+  componentName = DEFAULT_HOME_ACTIVITY,
+): Promise<void> {
+  const result = await transport.shell(["cmd", "package", "set-home-activity", componentName]);
+  ensureShellSuccess(result, `cmd package set-home-activity failed for ${componentName}`);
 }

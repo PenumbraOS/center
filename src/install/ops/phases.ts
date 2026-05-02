@@ -6,6 +6,7 @@ export const INSTALL_OPERATION_PHASES = [
   "Bootstrap",
   "Install",
   "Disable",
+  "Configure",
   "Verify",
 ] as const;
 

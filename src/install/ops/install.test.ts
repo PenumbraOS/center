@@ -258,6 +258,9 @@ describe("runInstallOperation", () => {
             },
           ];
         },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
         async verifyInstalledManagedState() {
           calls.push("verify");
           return createInspection();
@@ -265,7 +268,7 @@ describe("runInstallOperation", () => {
       },
     );
 
-    expect(calls).toEqual(["assets", "cleanup", "bootstrap", "install", "disable", "verify"]);
+    expect(calls).toEqual(["assets", "cleanup", "bootstrap", "install", "disable", "configure", "verify"]);
     expect(result.success).toBe(true);
     expect(result.warnings).toHaveLength(1);
     expect(result.rollbackAttempted).toBe(false);
@@ -319,6 +322,9 @@ describe("runInstallOperation", () => {
           calls.push("disable");
           return [];
         },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
         async verifyInstalledManagedState() {
           calls.push("verify");
           return createInspection();
@@ -329,6 +335,61 @@ describe("runInstallOperation", () => {
     expect(calls).toEqual(["assets"]);
     expect(result.success).toBe(false);
     expect(result.rollbackAttempted).toBe(false);
+  });
+
+  it("fails in Configure without auto-rollback when setting the default launcher fails", async () => {
+    const calls: string[] = [];
+    const transport = new FakeTransport();
+    const target = createTarget();
+
+    const result = await runInstallOperation(
+      {
+        transport,
+        target,
+      },
+      {
+        async downloadInstallTargetAssets() {
+          calls.push("assets");
+          return {
+            target,
+            installerApk: new Blob(["installer"]),
+            exploitApk: new Blob(["exploit"]),
+            hookApk: new Blob(["hook"]),
+            serverApk: new Blob(["server"]),
+            injectorApk: new Blob(["injector"]),
+          };
+        },
+        async cleanupManagedPackages() {
+          calls.push("cleanup");
+        },
+        async bootstrapFinalInstaller() {
+          calls.push("bootstrap");
+        },
+        async installManagedPackages() {
+          calls.push("install");
+        },
+        async disableConfiguredPackages() {
+          calls.push("disable");
+          return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
+          throw new Error("set-home-activity failed");
+        },
+        async verifyInstalledManagedState() {
+          calls.push("verify");
+          return createInspection();
+        },
+      },
+    );
+
+    expect(calls).toEqual(["assets", "cleanup", "bootstrap", "install", "disable", "configure"]);
+    expect(result.success).toBe(false);
+    expect(result.rollbackAttempted).toBe(false);
+    expect(result.rollbackSucceeded).toBe(false);
+    expect(result.rollbackAvailable).toBe(true);
+    expect(result.failedPhase).toBe("Configure");
+    expect(result.error?.message).toBe("set-home-activity failed");
   });
 
   it("preserves failed install state without auto-rollback", async () => {
@@ -366,6 +427,9 @@ describe("runInstallOperation", () => {
         async disableConfiguredPackages() {
           calls.push("disable");
           return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
         },
         async verifyInstalledManagedState() {
           calls.push("verify");

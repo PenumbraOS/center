@@ -21,6 +21,7 @@ import {
   installManagedPackages,
   verifyInstalledManagedState,
 } from "./shared";
+import { setHomeActivity } from "../device/packageManager";
 
 export interface InstallOperationResult {
   readonly success: boolean;
@@ -74,6 +75,7 @@ export interface InstallOperationInternals {
     },
   ): Promise<void>;
   disableConfiguredPackages(transport: AdbSessionTransport): Promise<OperationWarning[]>;
+  setHomeActivity(transport: AdbSessionTransport): Promise<void>;
   verifyInstalledManagedState(
     transport: AdbSessionTransport,
     target: ResolvedInstallTarget,
@@ -86,6 +88,7 @@ const defaultInstallInternals: InstallOperationInternals = {
   bootstrapFinalInstaller,
   installManagedPackages,
   disableConfiguredPackages,
+  setHomeActivity,
   verifyInstalledManagedState,
 };
 
@@ -335,11 +338,32 @@ export async function runInstallOperation(
       logEntry: true,
     });
 
+    failedPhase = "Configure";
+    emitPhaseProgress(options.onProgress, {
+      phase: "Configure",
+      message: "Setting default launcher.",
+      phaseIndex: 5,
+      phaseCompleted: 0,
+      phaseTotal: 1,
+      phaseUnitLabel: "step",
+      logEntry: true,
+    });
+    await internals.setHomeActivity(options.transport);
+    emitPhaseProgress(options.onProgress, {
+      phase: "Configure",
+      message: "Default launcher configured.",
+      phaseIndex: 5,
+      phaseCompleted: 1,
+      phaseTotal: 1,
+      phaseUnitLabel: "step",
+      logEntry: true,
+    });
+
     failedPhase = "Verify";
     emitPhaseProgress(options.onProgress, {
       phase: "Verify",
       message: "Verifying managed package state.",
-      phaseIndex: 5,
+      phaseIndex: 6,
       phaseCompleted: 0,
       phaseTotal: 1,
       phaseUnitLabel: "step",
@@ -349,7 +373,7 @@ export async function runInstallOperation(
     emitPhaseProgress(options.onProgress, {
       phase: "Verify",
       message: "Verification complete.",
-      phaseIndex: 5,
+      phaseIndex: 6,
       phaseCompleted: 1,
       phaseTotal: 1,
       phaseUnitLabel: "step",
