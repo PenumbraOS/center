@@ -14,8 +14,12 @@ export interface PinContextValue {
   memories: MemoryRecord[];
   /** Whether the initial memory list has been loaded. */
   memoriesLoaded: boolean;
+  /** Last connection error shown across routes. */
+  connectionError: string | null;
   /** Connect to a Pin server at the given base URL (e.g. "http://192.168.1.125:9090"). */
   connect: (baseUrl: string) => Promise<void>;
+  /** Clear the last connection error. */
+  clearConnectionError: () => void;
   /** Disconnect from the current server. */
   disconnect: () => void;
   /** Delete a memory by UUID. */

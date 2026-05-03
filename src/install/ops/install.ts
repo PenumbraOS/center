@@ -254,7 +254,6 @@ export async function runInstallOperation(
     failedPhase = "Install";
     const installTotal = 3;
     let installCompleted = 0;
-    let installCurrentPackage: string | null = null;
     emitPhaseProgress(options.onProgress, {
       phase: "Install",
       message: "Installing hook, server, and injector.",
@@ -272,9 +271,7 @@ export async function runInstallOperation(
         }
         emitPhaseProgress(options.onProgress, {
           phase: "Install",
-          message: installCurrentPackage
-            ? `${installCurrentPackage}: ${event.message}`
-            : event.message,
+          message: event.message,
           phaseIndex: 3,
           phaseCompleted: installCompleted,
           phaseTotal: installTotal,
@@ -283,7 +280,6 @@ export async function runInstallOperation(
         });
       },
       onPackageStart: ({ packageName, index, total }) => {
-        installCurrentPackage = packageName;
         emitPhaseProgress(options.onProgress, {
           phase: "Install",
           message: `Installing ${packageName} (${index + 1} of ${total}).`,

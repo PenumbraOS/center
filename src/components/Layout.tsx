@@ -38,10 +38,49 @@ function ConnectingOverlay() {
   );
 }
 
+function ConnectionErrorDialog({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="app-overlay">
+      <div
+        className="app-overlay-card install-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="connection-error-title"
+        aria-describedby="connection-error-copy"
+      >
+        <div>
+          <h2 id="connection-error-title" className="install-dialog__title">
+            Connection failed
+          </h2>
+          <p id="connection-error-copy" className="install-dialog__copy">
+            {message}
+          </p>
+        </div>
+
+        <div className="install-dialog__actions">
+          <button
+            type="button"
+            className="install-dialog__button install-dialog__button--primary"
+            onClick={onDismiss}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const PUBLIC_ROUTES = new Set(["/", "/connect"]);
 
 export default function Layout() {
-  const { status } = usePin();
+  const { status, connectionError, clearConnectionError } = usePin();
   const navigate = useNavigate();
   const location = useLocation();
   const connected = status === "connected";
@@ -71,7 +110,7 @@ export default function Layout() {
           },
         );
         navigate("/", { replace: true });
-      }, 5000);
+      }, 15000);
       return () => clearTimeout(timer);
     }
   }, [isPublicRoute, status, navigate, location.pathname]);
@@ -91,6 +130,12 @@ export default function Layout() {
       </SiteChrome>
 
       {status === "connecting" && <ConnectingOverlay />}
+      {connectionError && (
+        <ConnectionErrorDialog
+          message={connectionError}
+          onDismiss={clearConnectionError}
+        />
+      )}
     </>
   );
 }

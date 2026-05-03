@@ -25,9 +25,14 @@ export class PinClient {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(path: string, options?: RequestInit): Promise<T> {
+  private async request<T>(
+    path: string,
+    options?: RequestInit,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       ...options,
+      signal,
       // @ts-expect-error -- targetAddressSpace is not yet in TS lib types
       targetAddressSpace: "local",
     });
@@ -70,36 +75,40 @@ export class PinClient {
     return { available: true, text };
   }
 
-  health() {
-    return this.request<HealthInfo>("/api/health");
+  health(signal?: AbortSignal) {
+    return this.request<HealthInfo>("/api/health", undefined, signal);
   }
 
-  listMemories() {
-    return this.request<MemoryRecord[]>("/api/memories");
+  listMemories(signal?: AbortSignal) {
+    return this.request<MemoryRecord[]>("/api/memories", undefined, signal);
   }
 
-  getMemory(uuid: string) {
-    return this.request<MemoryRecord>(`/api/memories/${uuid}`);
+  getMemory(uuid: string, signal?: AbortSignal) {
+    return this.request<MemoryRecord>(`/api/memories/${uuid}`, undefined, signal);
   }
 
-  deleteMemory(uuid: string) {
-    return this.request<void>(`/api/memories/${uuid}`, { method: "DELETE" });
+  deleteMemory(uuid: string, signal?: AbortSignal) {
+    return this.request<void>(`/api/memories/${uuid}`, { method: "DELETE" }, signal);
   }
 
-  getSettings() {
-    return this.request<Settings>("/api/settings");
+  getSettings(signal?: AbortSignal) {
+    return this.request<Settings>("/api/settings", undefined, signal);
   }
 
-  updateSettings(s: UpdateSettingsRequest) {
-    return this.request<Settings>("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(s),
-    });
+  updateSettings(s: UpdateSettingsRequest, signal?: AbortSignal) {
+    return this.request<Settings>(
+      "/api/settings",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(s),
+      },
+      signal,
+    );
   }
 
-  getDevice() {
-    return this.request<DeviceInfo>("/api/device");
+  getDevice(signal?: AbortSignal) {
+    return this.request<DeviceInfo>("/api/device", undefined, signal);
   }
 
   thumbnailUrl(uuid: string, index: number) {

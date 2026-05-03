@@ -7,7 +7,7 @@ import { usePin, loadSavedUrl } from "../hooks";
 import { logError, logInfo } from "../logging";
 
 export default function ConnectPage() {
-  const { connect, status } = usePin();
+  const { connect, status, connectionError } = usePin();
   const navigate = useNavigate();
   const [address, setAddress] = useState(() => loadSavedUrl() ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,9 @@ export default function ConnectPage() {
     } catch (err) {
       logError("connect-page", "Connect failed", err, { url });
       setError(
-        "Could not connect. Check the address and make sure you have enabled LAN access in your browser.",
+        err instanceof Error && /timed out/i.test(err.message)
+          ? err.message
+          : "Could not connect. Check the address and make sure you have enabled LAN access in your browser.",
       );
       setPendingUrl(null);
     }
@@ -180,7 +182,7 @@ export default function ConnectPage() {
                 />
               </label>
 
-              {error && <p className="app-form-error">{error}</p>}
+              {error && !connectionError && <p className="app-form-error">{error}</p>}
 
               <div className="app-button-row">
                 <button
