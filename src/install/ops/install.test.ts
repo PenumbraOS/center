@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AdbDeviceStepTimeoutError } from "../device/adbTransport";
 import { runInstallOperation } from "./install";
 import type { ResolvedInstallTarget } from "../releases/assets";
 import type {
@@ -446,5 +447,58 @@ describe("runInstallOperation", () => {
     expect(result.rollbackSucceeded).toBe(false);
     expect(result.rollbackAvailable).toBe(true);
     expect(result.failedPhase).toBe("Bootstrap");
+  });
+
+  it("fails the install when a device-side step times out", async () => {
+    const calls: string[] = [];
+    const target = createTarget();
+
+    const result = await runInstallOperation(
+      {
+        transport: new FakeTransport(),
+        target,
+      },
+      {
+        async downloadInstallTargetAssets() {
+          calls.push("assets");
+          return {
+            target,
+            installerApk: new Blob(["installer"]),
+            exploitApk: new Blob(["exploit"]),
+            hookApk: new Blob(["hook"]),
+            serverApk: new Blob(["server"]),
+            injectorApk: new Blob(["injector"]),
+          };
+        },
+        async cleanupManagedPackages() {
+          calls.push("cleanup");
+          throw new AdbDeviceStepTimeoutError("shell pm uninstall com.penumbraos.server");
+        },
+        async bootstrapFinalInstaller() {
+          calls.push("bootstrap");
+        },
+        async installManagedPackages() {
+          calls.push("install");
+        },
+        async disableConfiguredPackages() {
+          calls.push("disable");
+          return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
+        async verifyInstalledManagedState() {
+          calls.push("verify");
+          return createInspection();
+        },
+      },
+    );
+
+    expect(calls).toEqual(["assets", "cleanup"]);
+    expect(result.success).toBe(false);
+    expect(result.failedPhase).toBe("Cleanup");
+    expect(result.rollbackAvailable).toBe(true);
+    expect(result.error).toBeInstanceOf(AdbDeviceStepTimeoutError);
+    expect(result.error?.message).toContain("60000ms");
   });
 });

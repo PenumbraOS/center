@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AdbDeviceStepTimeoutError } from "../device/adbTransport";
 import { runUninstallOperation } from "./uninstall";
 import type {
   AdbConnectionInfo,
@@ -109,5 +110,26 @@ describe("runUninstallOperation", () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.message).toContain("package still present");
+  });
+
+  it("returns failure when a device-side uninstall step times out", async () => {
+    const result = await runUninstallOperation(
+      {
+        transport: new FakeTransport(),
+      },
+      {
+        async cleanupManagedPackages() {
+          throw new AdbDeviceStepTimeoutError("shell pm uninstall com.penumbraos.server");
+        },
+        async restoreConfiguredPackages() {
+          return [];
+        },
+        async verifyUninstalledManagedState() {},
+      },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(AdbDeviceStepTimeoutError);
+    expect(result.error?.message).toContain("60000ms");
   });
 });

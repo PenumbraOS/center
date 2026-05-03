@@ -1,5 +1,8 @@
 import { inspectInstallState, type InstallInspectionResult } from "../domain/inspection";
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  type AdbSessionTransport,
+  withDeviceStepTimeout,
+} from "../device/adbTransport";
 import {
   disablePackageForUser,
   enablePackageForUser,
@@ -103,11 +106,15 @@ export async function installManagedPackages(
   let index = 0;
   for (const entry of INSTALL_PACKAGE_ORDER) {
     options?.onPackageStart?.({ packageName: entry.packageName, index, total });
-    await stageSystemApkInstall(transport, downloadedAssets[entry.assetKey], entry.fileName, {
-      packageName: entry.packageName,
-      waitForNextInstallProviderReady: entry.waitForNextInstallProviderReady,
-      onProgress: options?.onProgress,
-    });
+    await withDeviceStepTimeout(
+      `install ${entry.packageName}`,
+      () =>
+        stageSystemApkInstall(transport, downloadedAssets[entry.assetKey], entry.fileName, {
+          packageName: entry.packageName,
+          waitForNextInstallProviderReady: entry.waitForNextInstallProviderReady,
+          onProgress: options?.onProgress,
+        }),
+    );
     options?.onPackageCompleted?.({ packageName: entry.packageName, index, total });
     index += 1;
   }
@@ -124,12 +131,16 @@ export async function verifyInstalledManagedState(
   transport: AdbSessionTransport,
   target: ResolvedInstallTarget,
 ): Promise<InstallInspectionResult> {
-  await waitForManagedPackageVersions(transport);
-
-  const inspection = await inspectInstallState(transport, {
-    target,
-    readinessSettleDelayMs: 0,
-  });
+  const inspection = await withDeviceStepTimeout(
+    "verify install phase",
+    async () => {
+      await waitForManagedPackageVersions(transport);
+      return inspectInstallState(transport, {
+        target,
+        readinessSettleDelayMs: 0,
+      });
+    },
+  );
 
   const packages = Object.values(inspection.packages);
   if (inspection.helperPresentUnexpectedly) {
@@ -154,9 +165,11 @@ export async function verifyInstalledManagedState(
 export async function verifyUninstalledManagedState(
   transport: AdbSessionTransport,
 ): Promise<void> {
-  for (const packageName of MANAGED_CLEANUP_ORDER) {
-    if (await packageExists(transport, packageName)) {
-      throw new Error(`Managed package ${packageName} is still present.`);
+  await withDeviceStepTimeout("verify uninstall phase", async () => {
+    for (const packageName of MANAGED_CLEANUP_ORDER) {
+      if (await packageExists(transport, packageName)) {
+        throw new Error(`Managed package ${packageName} is still present.`);
+      }
     }
-  }
+  });
 }

@@ -1,4 +1,7 @@
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  createTimedAdbSessionTransport,
+  type AdbSessionTransport,
+} from "../device/adbTransport";
 import {
   ROLLBACK_OPERATION_PHASES,
   createOperationProgressEvent,
@@ -67,9 +70,18 @@ export async function runRollbackOperation(
   internals: RollbackOperationInternals = defaultRollbackInternals,
 ): Promise<RollbackOperationResult> {
   const warnings: OperationWarning[] = [];
+  const deviceTransport = createTimedAdbSessionTransport(options.transport);
+  let timedOut = false;
+
+  const emitProgress = (progressOptions: Parameters<typeof emitPhaseProgress>[1]) => {
+    if (timedOut) {
+      return;
+    }
+    emitPhaseProgress(options.onProgress, progressOptions);
+  };
 
   try {
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Cleanup",
       message: "Rollback cleanup started.",
       phaseIndex: 0,
@@ -78,8 +90,8 @@ export async function runRollbackOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.cleanupManagedPackages(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.cleanupManagedPackages(deviceTransport);
+    emitProgress({
       phase: "Cleanup",
       message: "Rollback cleanup finished.",
       phaseIndex: 0,
@@ -89,7 +101,7 @@ export async function runRollbackOperation(
       logEntry: true,
     });
 
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Restore",
       message: "Rollback restore started.",
       phaseIndex: 1,
@@ -98,8 +110,8 @@ export async function runRollbackOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    warnings.push(...(await internals.restoreConfiguredPackages(options.transport)));
-    emitPhaseProgress(options.onProgress, {
+    warnings.push(...(await internals.restoreConfiguredPackages(deviceTransport)));
+    emitProgress({
       phase: "Restore",
       message: "Rollback restore finished.",
       phaseIndex: 1,
@@ -109,7 +121,7 @@ export async function runRollbackOperation(
       logEntry: true,
     });
 
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Verify",
       message: "Rollback verify started.",
       phaseIndex: 2,
@@ -118,8 +130,8 @@ export async function runRollbackOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.verifyUninstalledManagedState(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.verifyUninstalledManagedState(deviceTransport);
+    emitProgress({
       phase: "Verify",
       message: "Rollback verification complete.",
       phaseIndex: 2,
@@ -136,6 +148,7 @@ export async function runRollbackOperation(
       error: null,
     };
   } catch (error) {
+    timedOut = true;
     return {
       success: false,
       warnings,

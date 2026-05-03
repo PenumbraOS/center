@@ -1,4 +1,7 @@
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  createTimedAdbSessionTransport,
+  type AdbSessionTransport,
+} from "../device/adbTransport";
 import {
   UNINSTALL_OPERATION_PHASES,
   createOperationProgressEvent,
@@ -67,9 +70,18 @@ export async function runUninstallOperation(
   internals: UninstallOperationInternals = defaultUninstallInternals,
 ): Promise<UninstallOperationResult> {
   const warnings: OperationWarning[] = [];
+  const deviceTransport = createTimedAdbSessionTransport(options.transport);
+  let timedOut = false;
+
+  const emitProgress = (progressOptions: Parameters<typeof emitPhaseProgress>[1]) => {
+    if (timedOut) {
+      return;
+    }
+    emitPhaseProgress(options.onProgress, progressOptions);
+  };
 
   try {
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Cleanup",
       message: "Uninstall cleanup started.",
       phaseIndex: 0,
@@ -78,8 +90,8 @@ export async function runUninstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.cleanupManagedPackages(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.cleanupManagedPackages(deviceTransport);
+    emitProgress({
       phase: "Cleanup",
       message: "Managed package cleanup finished.",
       phaseIndex: 0,
@@ -89,7 +101,7 @@ export async function runUninstallOperation(
       logEntry: true,
     });
 
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Restore",
       message: "Restore of stock/system packages started.",
       phaseIndex: 1,
@@ -98,8 +110,8 @@ export async function runUninstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    warnings.push(...(await internals.restoreConfiguredPackages(options.transport)));
-    emitPhaseProgress(options.onProgress, {
+    warnings.push(...(await internals.restoreConfiguredPackages(deviceTransport)));
+    emitProgress({
       phase: "Restore",
       message: "Configured stock/system package restore finished.",
       phaseIndex: 1,
@@ -109,7 +121,7 @@ export async function runUninstallOperation(
       logEntry: true,
     });
 
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Verify",
       message: "Uninstall verification started.",
       phaseIndex: 2,
@@ -118,8 +130,8 @@ export async function runUninstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.verifyUninstalledManagedState(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.verifyUninstalledManagedState(deviceTransport);
+    emitProgress({
       phase: "Verify",
       message: "Uninstall verification complete.",
       phaseIndex: 2,
@@ -136,6 +148,7 @@ export async function runUninstallOperation(
       error: null,
     };
   } catch (error) {
+    timedOut = true;
     return {
       success: false,
       warnings,

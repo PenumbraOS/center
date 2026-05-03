@@ -1,4 +1,7 @@
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  createTimedAdbSessionTransport,
+  type AdbSessionTransport,
+} from "../device/adbTransport";
 import type { DetectedPackageConflict, KnownPackageConflictCleanupCommand } from "../domain/types";
 import { packageExists, uninstallPackage } from "../device/packageManager";
 import {
@@ -82,6 +85,16 @@ export async function runRemoveConflictsOperation(
   options: RemoveConflictsOperationOptions,
   internals: RemoveConflictsOperationInternals = defaultRemoveConflictsInternals,
 ): Promise<RemoveConflictsOperationResult> {
+  const deviceTransport = createTimedAdbSessionTransport(options.transport);
+  let timedOut = false;
+
+  const emitConflictProgress = (progressOptions: Parameters<typeof emitProgress>[1]) => {
+    if (timedOut) {
+      return;
+    }
+    emitProgress(options.onProgress, progressOptions);
+  };
+
   const conflicts = options.conflicts.filter(
     (conflict) =>
       conflict.installedPackageIds.length > 0 || conflict.cleanupCommands.length > 0,
@@ -101,7 +114,7 @@ export async function runRemoveConflictsOperation(
   }
 
   try {
-    emitProgress(options.onProgress, {
+    emitConflictProgress({
       message: "Conflict cleanup started.",
       completed: 0,
       total: totalSteps,
@@ -110,22 +123,22 @@ export async function runRemoveConflictsOperation(
 
     for (const conflict of conflicts) {
       for (const packageId of conflict.installedPackageIds) {
-        emitProgress(options.onProgress, {
+        emitConflictProgress({
           message: `Removing ${packageId} from ${conflict.label}.`,
           completed: completedSteps,
           total: totalSteps,
           logEntry: true,
         });
 
-        await internals.uninstallPackage(options.transport, packageId);
+        await internals.uninstallPackage(deviceTransport, packageId);
 
-        if (await internals.packageExists(options.transport, packageId)) {
+        if (await internals.packageExists(deviceTransport, packageId)) {
           throw new Error(`Known conflicting package ${packageId} is still present.`);
         }
 
         removedPackageIds.push(packageId);
         completedSteps += 1;
-        emitProgress(options.onProgress, {
+        emitConflictProgress({
           message: `Removed ${packageId}.`,
           completed: completedSteps,
           total: totalSteps,
@@ -134,14 +147,14 @@ export async function runRemoveConflictsOperation(
       }
 
       for (const command of conflict.cleanupCommands) {
-        emitProgress(options.onProgress, {
+        emitConflictProgress({
           message: `Running cleanup for ${conflict.label}: ${command.description ?? command.argv.join(" ")}.`,
           completed: completedSteps,
           total: totalSteps,
           logEntry: true,
         });
 
-        const result = await internals.runCleanupCommand(options.transport, command);
+        const result = await internals.runCleanupCommand(deviceTransport, command);
         completedSteps += 1;
 
         if (!result.success) {
@@ -151,7 +164,7 @@ export async function runRemoveConflictsOperation(
           });
         }
 
-        emitProgress(options.onProgress, {
+        emitConflictProgress({
           message: result.success
             ? `Cleanup finished for ${conflict.label}.`
             : `Cleanup warning for ${conflict.label}: ${result.message}`,
@@ -162,7 +175,7 @@ export async function runRemoveConflictsOperation(
       }
     }
 
-    emitProgress(options.onProgress, {
+    emitConflictProgress({
       message: "Conflict cleanup complete.",
       completed: totalSteps,
       total: totalSteps,
@@ -177,6 +190,7 @@ export async function runRemoveConflictsOperation(
       removedPackageIds,
     };
   } catch (error) {
+    timedOut = true;
     return {
       success: false,
       warnings,

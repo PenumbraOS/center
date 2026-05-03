@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AdbDeviceStepTimeoutError } from "../device/adbTransport";
 import { runRemoveConflictsOperation } from "./removeConflicts";
 import type { DetectedPackageConflict } from "../domain/types";
 import type {
@@ -185,5 +186,37 @@ describe("runRemoveConflictsOperation", () => {
         message: expect.stringContaining("clear failed"),
       }),
     ]);
+  });
+
+  it("returns failure when a device-side cleanup command times out", async () => {
+    const result = await runRemoveConflictsOperation(
+      {
+        transport: new FakeTransport(),
+        conflicts: [
+          createConflict({
+            installedPackageIds: [],
+            cleanupCommands: [
+              {
+                argv: ["pm", "clear", "legacy.data"],
+                description: "Clear legacy data",
+              },
+            ],
+          }),
+        ],
+      },
+      {
+        async uninstallPackage() {},
+        async packageExists() {
+          return false;
+        },
+        async runCleanupCommand() {
+          throw new AdbDeviceStepTimeoutError("shell pm clear legacy.data");
+        },
+      },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(AdbDeviceStepTimeoutError);
+    expect(result.warnings).toEqual([]);
   });
 });

@@ -169,8 +169,7 @@ export async function enablePackageForUser(
   transport: AdbSessionTransport,
   packageName: string,
 ): Promise<PackageEnableDisableResult> {
-  // const result = await transport.shell(["pm", "enable", "--user", "0", packageName]);
-  const result = await transport.shell(["sh", "-c", "sleep 100"]);
+  const result = await transport.shell(["pm", "enable", "--user", "0", packageName]);
 
   return {
     packageName,

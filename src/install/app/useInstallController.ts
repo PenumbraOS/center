@@ -7,9 +7,14 @@ import {
   lockResolvedInstallTarget,
   type TargetLock,
 } from "../releases/targetLock";
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  AdbDeviceStepTimeoutError,
+  createTimedAdbSessionTransport,
+  type AdbSessionTransport,
+} from "../device/adbTransport";
 import { getBrowserSupport } from "../device/browserSupport";
 import { runInstallOperation } from "../ops/install";
+import type { OperationProgressEvent } from "../ops/phases";
 import { runRollbackOperation } from "../ops/rollback";
 import { runRemoveConflictsOperation } from "../ops/removeConflicts";
 import { runUninstallOperation } from "../ops/uninstall";
@@ -46,6 +51,10 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isDeviceStepTimeoutError(error: unknown): error is AdbDeviceStepTimeoutError {
+  return error instanceof AdbDeviceStepTimeoutError;
+}
+
 function getInspectionTargetResolutionError(
   inspection: InstallInspectionResult | null,
 ): Error | null {
@@ -58,6 +67,44 @@ function getInspectionTargetResolutionError(
 
 function getActiveTarget(state: InstallControllerState): ResolvedInstallTarget | null {
   return getLockedTarget(state.targetLock) ?? state.target;
+}
+
+function isTimedOutOperationError(error: unknown) {
+  return isDeviceStepTimeoutError(error);
+}
+
+async function resolvePostOperationInspection<Result extends { readonly error: Error | null }>(
+  result: Result,
+  loadInspection: () => Promise<InstallInspectionResult | null>,
+) {
+  if (isTimedOutOperationError(result.error)) {
+    return null;
+  }
+
+  return loadInspection();
+}
+
+function createProgressDispatcher(options: {
+  onDispatch: (event: OperationProgressEvent) => void;
+  mapEvent?: (event: OperationProgressEvent) => OperationProgressEvent;
+}) {
+  let timedOut = false;
+
+  return {
+    isTimedOut() {
+      return timedOut;
+    },
+    markTimedOut(error: unknown) {
+      timedOut = timedOut || isTimedOutOperationError(error);
+    },
+    onProgress(event: OperationProgressEvent) {
+      if (timedOut) {
+        return;
+      }
+
+      options.onDispatch(options.mapEvent ? options.mapEvent(event) : event);
+    },
+  };
 }
 
 export function useInstallController(
@@ -195,23 +242,34 @@ export function useInstallController(
     dispatch({ type: "operation-started" });
 
     try {
-      const result = await runInstallOperation({
-        transport,
-        target: activeTarget,
-        onProgress: (event) => {
+      const timedTransport = createTimedAdbSessionTransport(transport);
+      const progress = createProgressDispatcher({
+        onDispatch: (event) => {
           dispatch({
             type: "operation-progress",
             event,
           });
+        },
+      });
 
-          if (event.logEntry === false || inspectionRefreshInFlight) {
+      const result = await runInstallOperation({
+        transport,
+        target: activeTarget,
+        onProgress: (event) => {
+          progress.onProgress(event);
+
+          if (progress.isTimedOut() || event.logEntry === false || inspectionRefreshInFlight) {
             return;
           }
 
-          inspectionRefreshInFlight = refreshInspection(transport, {
+          inspectionRefreshInFlight = refreshInspection(timedTransport, {
             target: activeTarget,
           })
             .then((inspection) => {
+              if (progress.isTimedOut()) {
+                return;
+              }
+
               dispatch({
                 type: "operation-inspection-updated",
                 inspection,
@@ -224,15 +282,21 @@ export function useInstallController(
         },
       });
 
-      if (inspectionRefreshInFlight) {
+      progress.markTimedOut(result.error);
+
+      if (inspectionRefreshInFlight && !progress.isTimedOut()) {
         await inspectionRefreshInFlight;
       }
 
-      const nextInspection = result.inspection
-        ? result.inspection
-        : await refreshInspection(transport, {
-            target: activeTarget,
-          });
+      const nextInspection = await resolvePostOperationInspection(result, async () => {
+        if (result.inspection) {
+          return result.inspection;
+        }
+
+        return refreshInspection(transport, {
+          target: activeTarget,
+        });
+      });
 
       const operationResult: ControllerOperationResult = {
         kind: "install",
@@ -255,24 +319,30 @@ export function useInstallController(
   const runRollback = useCallback(async () => {
     const transport = ensureTransport();
     const currentState = stateRef.current;
+    const progress = createProgressDispatcher({
+      onDispatch: (event) => {
+        dispatch({
+          type: "operation-progress",
+          event,
+        });
+      },
+    });
 
     dispatch({ type: "operation-started" });
 
     try {
       const result = await runRollbackOperation({
         transport,
-        onProgress: (event) => {
-          dispatch({
-            type: "operation-progress",
-            event,
-          });
-        },
+        onProgress: progress.onProgress,
       });
 
-      const nextInspection = await refreshInspection(transport, {
-        target: getActiveTarget(currentState),
-        targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
-      });
+      progress.markTimedOut(result.error);
+      const nextInspection = await resolvePostOperationInspection(result, () =>
+        refreshInspection(transport, {
+          target: getActiveTarget(currentState),
+          targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
+        }),
+      );
 
       const operationResult: ControllerOperationResult = {
         kind: "uninstall",
@@ -299,24 +369,30 @@ export function useInstallController(
   const runUninstall = useCallback(async () => {
     const transport = ensureTransport();
     const currentState = stateRef.current;
+    const progress = createProgressDispatcher({
+      onDispatch: (event) => {
+        dispatch({
+          type: "operation-progress",
+          event,
+        });
+      },
+    });
 
     dispatch({ type: "operation-started" });
 
     try {
       const result = await runUninstallOperation({
         transport,
-        onProgress: (event) => {
-          dispatch({
-            type: "operation-progress",
-            event,
-          });
-        },
+        onProgress: progress.onProgress,
       });
 
-      const nextInspection = await refreshInspection(transport, {
-        target: getActiveTarget(currentState),
-        targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
-      });
+      progress.markTimedOut(result.error);
+      const nextInspection = await resolvePostOperationInspection(result, () =>
+        refreshInspection(transport, {
+          target: getActiveTarget(currentState),
+          targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
+        }),
+      );
 
       const operationResult: ControllerOperationResult = {
         kind: "uninstall",
@@ -345,6 +421,14 @@ export function useInstallController(
         conflict.installedPackageIds.length > 0 ||
         conflict.cleanupCommands.length > 0,
     );
+    const progress = createProgressDispatcher({
+      onDispatch: (event) => {
+        dispatch({
+          type: "operation-progress",
+          event,
+        });
+      },
+    });
 
     if (!hasConflictCleanupWork) {
       return;
@@ -356,20 +440,18 @@ export function useInstallController(
       const result = await runRemoveConflictsOperation({
         transport,
         conflicts: detectedConflicts,
-        onProgress: (event) => {
-          dispatch({
-            type: "operation-progress",
-            event,
-          });
-        },
+        onProgress: progress.onProgress,
       });
 
-      const nextInspection = await refreshInspection(transport, {
-        target: getActiveTarget(currentState),
-        targetResolutionError: getInspectionTargetResolutionError(
-          currentState.inspection,
-        ),
-      });
+      progress.markTimedOut(result.error);
+      const nextInspection = await resolvePostOperationInspection(result, () =>
+        refreshInspection(transport, {
+          target: getActiveTarget(currentState),
+          targetResolutionError: getInspectionTargetResolutionError(
+            currentState.inspection,
+          ),
+        }),
+      );
 
       const operationResult: ControllerOperationResult = {
         kind: "remove-conflicts",
@@ -418,6 +500,33 @@ export function useInstallController(
     dispatch({ type: "operation-started" });
 
     try {
+      const timedTransport = createTimedAdbSessionTransport(transport);
+      const conflictProgress = createProgressDispatcher({
+        onDispatch: (event) => {
+          dispatch({
+            type: "operation-progress",
+            event: {
+              ...event,
+              overallPercent: Math.round(event.overallPercent * 0.15),
+            },
+          });
+        },
+      });
+      const installProgress = createProgressDispatcher({
+        onDispatch: (event) => {
+          dispatch({
+            type: "operation-progress",
+            event: {
+              ...event,
+              overallPercent: Math.min(
+                100,
+                15 + Math.round((event.overallPercent / 100) * 85),
+              ),
+            },
+          });
+        },
+      });
+
       dispatch({
         type: "operation-progress",
         event: {
@@ -436,23 +545,20 @@ export function useInstallController(
       const conflictResult = await runRemoveConflictsOperation({
         transport,
         conflicts: detectedConflicts,
-        onProgress: (event) => {
-          dispatch({
-            type: "operation-progress",
-            event: {
-              ...event,
-              overallPercent: Math.round(event.overallPercent * 0.15),
-            },
-          });
-        },
+        onProgress: conflictProgress.onProgress,
       });
 
-      const inspectionAfterConflictCleanup = await refreshInspection(transport, {
-        target: activeTarget,
-        targetResolutionError: getInspectionTargetResolutionError(
-          currentState.inspection,
-        ),
-      });
+      conflictProgress.markTimedOut(conflictResult.error);
+      const inspectionAfterConflictCleanup = await resolvePostOperationInspection(
+        conflictResult,
+        () =>
+          refreshInspection(transport, {
+            target: activeTarget,
+            targetResolutionError: getInspectionTargetResolutionError(
+              currentState.inspection,
+            ),
+          }),
+      );
 
       if (!conflictResult.success) {
         dispatch({
@@ -477,7 +583,7 @@ export function useInstallController(
         return;
       }
 
-      if (inspectionAfterConflictCleanup.hasDetectedConflicts) {
+      if (inspectionAfterConflictCleanup?.hasDetectedConflicts) {
         dispatch({
           type: "operation-completed",
           result: {
@@ -502,10 +608,12 @@ export function useInstallController(
         return;
       }
 
-      dispatch({
-        type: "operation-inspection-updated",
-        inspection: inspectionAfterConflictCleanup,
-      });
+      if (inspectionAfterConflictCleanup) {
+        dispatch({
+          type: "operation-inspection-updated",
+          inspection: inspectionAfterConflictCleanup,
+        });
+      }
 
       dispatch({
         type: "operation-progress",
@@ -526,25 +634,20 @@ export function useInstallController(
         transport,
         target: activeTarget,
         onProgress: (event) => {
-          dispatch({
-            type: "operation-progress",
-            event: {
-              ...event,
-              overallPercent: Math.min(
-                100,
-                15 + Math.round((event.overallPercent / 100) * 85),
-              ),
-            },
-          });
+          installProgress.onProgress(event);
 
-          if (event.logEntry === false || inspectionRefreshInFlight) {
+          if (installProgress.isTimedOut() || event.logEntry === false || inspectionRefreshInFlight) {
             return;
           }
 
-          inspectionRefreshInFlight = refreshInspection(transport, {
+          inspectionRefreshInFlight = refreshInspection(timedTransport, {
             target: activeTarget,
           })
             .then((inspection) => {
+              if (installProgress.isTimedOut()) {
+                return;
+              }
+
               dispatch({
                 type: "operation-inspection-updated",
                 inspection,
@@ -557,15 +660,21 @@ export function useInstallController(
         },
       });
 
-      if (inspectionRefreshInFlight) {
+      installProgress.markTimedOut(installResult.error);
+
+      if (inspectionRefreshInFlight && !installProgress.isTimedOut()) {
         await inspectionRefreshInFlight;
       }
 
-      const nextInspection = installResult.inspection
-        ? installResult.inspection
-        : await refreshInspection(transport, {
-            target: activeTarget,
-          });
+      const nextInspection = await resolvePostOperationInspection(installResult, async () => {
+        if (installResult.inspection) {
+          return installResult.inspection;
+        }
+
+        return refreshInspection(transport, {
+          target: activeTarget,
+        });
+      });
 
       const operationResult: ControllerOperationResult = {
         kind: "install",

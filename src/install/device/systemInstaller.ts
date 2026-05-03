@@ -1,4 +1,10 @@
-import type { AdbSessionTransport, ShellResult } from "./adbTransport";
+import {
+  AdbDeviceStepTimeoutError,
+  DEVICE_STEP_TIMEOUT_MS,
+  type AdbSessionTransport,
+  type ShellResult,
+  withDeviceStepTimeout,
+} from "./adbTransport";
 import { MANAGED_PACKAGES, packageExists } from "./packageManager";
 
 export const DEVICE_TMP_DIR = "/data/local/tmp";
@@ -8,8 +14,8 @@ export const EXPLOIT_STAGE1_ACTION = "com.penumbraos.systeminjector.exploit.STAG
 export const EXPLOIT_STAGE2_ACTION = "com.penumbraos.systeminjector.exploit.STAGE2";
 export const EXPLOIT_RECEIVER = "com.penumbraos.systeminjector.exploit/.InstallReceiver";
 export const POLL_INTERVAL_MS = 3000;
-export const POLL_TIMEOUT_MS = 120000;
-export const SYSTEM_READY_TIMEOUT_MS = 60000;
+export const POLL_TIMEOUT_MS = DEVICE_STEP_TIMEOUT_MS;
+export const SYSTEM_READY_TIMEOUT_MS = DEVICE_STEP_TIMEOUT_MS;
 export const SYSTEM_READY_POLL_MS = 2000;
 export const SYSTEM_READY_SETTLE_MS = 3000;
 export const SOFT_REBOOT_STABILIZATION_MS = 20000;
@@ -70,6 +76,10 @@ function shellSingleQuote(value: string): string {
   return "'" + value.replaceAll("'", "'\\''") + "'";
 }
 
+function isDeviceStepTimeoutError(error: unknown): error is AdbDeviceStepTimeoutError {
+  return error instanceof AdbDeviceStepTimeoutError;
+}
+
 export async function waitForDeviceReady(
   transport: AdbSessionTransport,
   timeoutMs = 30000,
@@ -81,7 +91,10 @@ export async function waitForDeviceReady(
     try {
       await transport.shell(["echo", "ready"]);
       return;
-    } catch {
+    } catch (error) {
+      if (isDeviceStepTimeoutError(error)) {
+        throw error;
+      }
       await sleep(pollMs);
     }
   }
@@ -106,7 +119,10 @@ export async function waitForPackageManagerReady(
         await sleep(settleMs);
         return;
       }
-    } catch {
+    } catch (error) {
+      if (isDeviceStepTimeoutError(error)) {
+        throw error;
+      }
       // Retry until timeout.
     }
 
@@ -130,9 +146,19 @@ async function waitForSoftRebootRecovery(
   transport: AdbSessionTransport,
   delayMs = SOFT_REBOOT_STABILIZATION_MS,
 ): Promise<void> {
-  await waitForSoftRebootStabilization(delayMs);
-  await waitForDeviceReady(transport, POLL_TIMEOUT_MS, SYSTEM_READY_POLL_MS);
-  await waitForPackageManagerReady(transport, SYSTEM_READY_TIMEOUT_MS, SYSTEM_READY_POLL_MS, SYSTEM_READY_SETTLE_MS);
+  await withDeviceStepTimeout(
+    "soft reboot recovery",
+    async () => {
+      await waitForSoftRebootStabilization(delayMs);
+      await waitForDeviceReady(transport, DEVICE_STEP_TIMEOUT_MS, SYSTEM_READY_POLL_MS);
+      await waitForPackageManagerReady(
+        transport,
+        DEVICE_STEP_TIMEOUT_MS,
+        SYSTEM_READY_POLL_MS,
+        SYSTEM_READY_SETTLE_MS,
+      );
+    },
+  );
 }
 
 export async function pollForPackage(
@@ -148,7 +174,10 @@ export async function pollForPackage(
       if (await packageExists(transport, packageName)) {
         return true;
       }
-    } catch {
+    } catch (error) {
+      if (isDeviceStepTimeoutError(error)) {
+        throw error;
+      }
       // Retry until timeout.
     }
 
@@ -174,7 +203,10 @@ export async function waitForStagingProviderReady(
       if (!hasProviderAccessError(output)) {
         return;
       }
-    } catch {
+    } catch (error) {
+      if (isDeviceStepTimeoutError(error)) {
+        throw error;
+      }
       // Retry until timeout.
     }
 
@@ -187,8 +219,9 @@ export async function waitForStagingProviderReady(
 async function waitForPackagePresence(
   transport: AdbSessionTransport,
   packageName: string,
+  timeoutMs = POLL_TIMEOUT_MS,
 ): Promise<void> {
-  const found = await pollForPackage(transport, packageName);
+  const found = await pollForPackage(transport, packageName, POLL_INTERVAL_MS, timeoutMs);
   if (!found) {
     throw new Error(`Timed out waiting for ${packageName} to appear.`);
   }

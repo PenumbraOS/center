@@ -61,6 +61,137 @@ export interface AdbSessionTransport {
   ): Promise<CommandStreamController>;
 }
 
+export const DEVICE_STEP_TIMEOUT_MS = 60000;
+
+export class AdbDeviceStepTimeoutError extends Error {
+  readonly operation: string;
+  readonly timeoutMs: number;
+
+  constructor(operation: string, timeoutMs = DEVICE_STEP_TIMEOUT_MS) {
+    super(`Timed out after ${timeoutMs}ms during device step: ${operation}.`);
+    this.name = "AdbDeviceStepTimeoutError";
+    this.operation = operation;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+const timedTransportCache = new WeakMap<AdbSessionTransport, AdbSessionTransport>();
+const timedTransportWrappers = new WeakSet<AdbSessionTransport>();
+
+function formatCommand(command: string | readonly string[]) {
+  return Array.isArray(command) ? command.join(" ") : command;
+}
+
+export function withDeviceStepTimeout<T>(
+  operation: string,
+  work: () => Promise<T>,
+  timeoutMs = DEVICE_STEP_TIMEOUT_MS,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timeoutId = globalThis.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      reject(new AdbDeviceStepTimeoutError(operation, timeoutMs));
+    }, timeoutMs);
+
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      globalThis.clearTimeout(timeoutId);
+      callback();
+    };
+
+    let workPromise: Promise<T>;
+    try {
+      workPromise = work();
+    } catch (error) {
+      settle(() => reject(error));
+      return;
+    }
+
+    workPromise.then(
+      (value) => {
+        settle(() => resolve(value));
+      },
+      (error) => {
+        settle(() => reject(error));
+      },
+    );
+  });
+}
+
+export function createTimedAdbSessionTransport(
+  transport: AdbSessionTransport,
+  timeoutMs = DEVICE_STEP_TIMEOUT_MS,
+): AdbSessionTransport {
+  if (timedTransportWrappers.has(transport)) {
+    return transport;
+  }
+
+  if (timeoutMs === DEVICE_STEP_TIMEOUT_MS) {
+    const cached = timedTransportCache.get(transport);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const wrappedTransport: AdbSessionTransport = {
+    get connectionInfo() {
+      return transport.connectionInfo;
+    },
+    connect() {
+      return transport.connect();
+    },
+    reconnect() {
+      return transport.reconnect();
+    },
+    disconnect() {
+      return transport.disconnect();
+    },
+    shell(command) {
+      return withDeviceStepTimeout(
+        `shell ${formatCommand(command)}`,
+        () => transport.shell(command),
+        timeoutMs,
+      );
+    },
+    shellWithInput(command, input, options) {
+      return withDeviceStepTimeout(
+        `shellWithInput ${formatCommand(command)}`,
+        () => transport.shellWithInput(command, input, options),
+        timeoutMs,
+      );
+    },
+    pushFile(remotePath, file) {
+      return withDeviceStepTimeout(
+        `pushFile ${remotePath}`,
+        () => transport.pushFile(remotePath, file),
+        timeoutMs,
+      );
+    },
+    reboot() {
+      return withDeviceStepTimeout("reboot", () => transport.reboot(), timeoutMs);
+    },
+    startCommandStream(command, onLine) {
+      return transport.startCommandStream(command, onLine);
+    },
+  };
+
+  timedTransportWrappers.add(wrappedTransport);
+  if (timeoutMs === DEVICE_STEP_TIMEOUT_MS) {
+    timedTransportCache.set(transport, wrappedTransport);
+  }
+
+  return wrappedTransport;
+}
+
 export class AdbTransportRecoveredDisconnectError extends Error {
   readonly operation: string;
   readonly attemptsSinceSuccess: number;

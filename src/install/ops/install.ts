@@ -1,4 +1,7 @@
-import type { AdbSessionTransport } from "../device/adbTransport";
+import {
+  createTimedAdbSessionTransport,
+  type AdbSessionTransport,
+} from "../device/adbTransport";
 import type { SystemInstallerProgressEvent } from "../device/systemInstaller";
 import {
   downloadInstallTargetAssets,
@@ -154,11 +157,27 @@ export async function runInstallOperation(
   internals: InstallOperationInternals = defaultInstallInternals,
 ): Promise<InstallOperationResult> {
   const warnings: OperationWarning[] = [];
+  const deviceTransport = createTimedAdbSessionTransport(options.transport);
   let destructiveWorkStarted = false;
   let failedPhase: InstallOperationPhase | null = null;
+  let timedOut = false;
+
+  const emitProgress = (progressOptions: Parameters<typeof emitPhaseProgress>[1]) => {
+    if (timedOut) {
+      return;
+    }
+    emitPhaseProgress(options.onProgress, progressOptions);
+  };
+
+  const emitInstallerProgress = (event: SystemInstallerProgressEvent) => {
+    if (timedOut) {
+      return;
+    }
+    emitInstallerSubstep(options.onProgress, event);
+  };
 
   try {
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Assets",
       message: "Downloading install assets.",
       phaseIndex: 0,
@@ -201,7 +220,7 @@ export async function runInstallOperation(
 
     failedPhase = "Cleanup";
     destructiveWorkStarted = true;
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Cleanup",
       message: "Removing managed packages before reinstall.",
       phaseIndex: 1,
@@ -210,8 +229,8 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.cleanupManagedPackages(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.cleanupManagedPackages(deviceTransport);
+    emitProgress({
       phase: "Cleanup",
       message: "Managed package cleanup finished.",
       phaseIndex: 1,
@@ -222,7 +241,7 @@ export async function runInstallOperation(
     });
 
     failedPhase = "Bootstrap";
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Bootstrap",
       message: "Bootstrapping final installer package.",
       phaseIndex: 2,
@@ -232,16 +251,16 @@ export async function runInstallOperation(
       logEntry: true,
     });
     await internals.bootstrapFinalInstaller(
-      options.transport,
+      deviceTransport,
       {
         installerApk: downloadedAssets.installerApk,
         exploitApk: downloadedAssets.exploitApk,
       },
       {
-        onProgress: (event) => emitInstallerSubstep(options.onProgress, event),
+        onProgress: (event) => emitInstallerProgress(event),
       },
     );
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Bootstrap",
       message: "Final installer bootstrapped.",
       phaseIndex: 2,
@@ -254,7 +273,7 @@ export async function runInstallOperation(
     failedPhase = "Install";
     const installTotal = 3;
     let installCompleted = 0;
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Install",
       message: "Installing hook, server, and injector.",
       phaseIndex: 3,
@@ -263,13 +282,13 @@ export async function runInstallOperation(
       phaseUnitLabel: "package",
       logEntry: true,
     });
-    await internals.installManagedPackages(options.transport, downloadedAssets, {
+    await internals.installManagedPackages(deviceTransport, downloadedAssets, {
       onProgress: (event) => {
         if (event.step.startsWith("bootstrap")) {
-          emitInstallerSubstep(options.onProgress, event);
+          emitInstallerProgress(event);
           return;
         }
-        emitPhaseProgress(options.onProgress, {
+        emitProgress({
           phase: "Install",
           message: event.message,
           phaseIndex: 3,
@@ -280,7 +299,7 @@ export async function runInstallOperation(
         });
       },
       onPackageStart: ({ packageName, index, total }) => {
-        emitPhaseProgress(options.onProgress, {
+        emitProgress({
           phase: "Install",
           message: `Installing ${packageName} (${index + 1} of ${total}).`,
           phaseIndex: 3,
@@ -292,7 +311,7 @@ export async function runInstallOperation(
       },
       onPackageCompleted: ({ packageName, index, total }) => {
         installCompleted = index + 1;
-        emitPhaseProgress(options.onProgress, {
+        emitProgress({
           phase: "Install",
           message: `Installed ${packageName}.`,
           phaseIndex: 3,
@@ -303,7 +322,7 @@ export async function runInstallOperation(
         });
       },
     });
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Install",
       message: "Managed package installation finished.",
       phaseIndex: 3,
@@ -314,7 +333,7 @@ export async function runInstallOperation(
     });
 
     failedPhase = "Disable";
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Disable",
       message: "Disabling configured stock/system packages.",
       phaseIndex: 4,
@@ -323,8 +342,8 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    warnings.push(...(await internals.disableConfiguredPackages(options.transport)));
-    emitPhaseProgress(options.onProgress, {
+    warnings.push(...(await internals.disableConfiguredPackages(deviceTransport)));
+    emitProgress({
       phase: "Disable",
       message: "Configured stock/system package changes finished.",
       phaseIndex: 4,
@@ -335,7 +354,7 @@ export async function runInstallOperation(
     });
 
     failedPhase = "Configure";
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Configure",
       message: "Setting default launcher.",
       phaseIndex: 5,
@@ -344,8 +363,8 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    await internals.setHomeActivity(options.transport);
-    emitPhaseProgress(options.onProgress, {
+    await internals.setHomeActivity(deviceTransport);
+    emitProgress({
       phase: "Configure",
       message: "Default launcher configured.",
       phaseIndex: 5,
@@ -356,7 +375,7 @@ export async function runInstallOperation(
     });
 
     failedPhase = "Verify";
-    emitPhaseProgress(options.onProgress, {
+    emitProgress({
       phase: "Verify",
       message: "Verifying managed package state.",
       phaseIndex: 6,
@@ -365,8 +384,8 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    const inspection = await internals.verifyInstalledManagedState(options.transport, options.target);
-    emitPhaseProgress(options.onProgress, {
+    const inspection = await internals.verifyInstalledManagedState(deviceTransport, options.target);
+    emitProgress({
       phase: "Verify",
       message: "Verification complete.",
       phaseIndex: 6,
@@ -388,6 +407,7 @@ export async function runInstallOperation(
       rollbackAvailable: false,
     };
   } catch (error) {
+    timedOut = true;
     const operationError = error instanceof Error ? error : new Error(String(error));
 
     return {

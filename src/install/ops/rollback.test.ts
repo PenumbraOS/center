@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AdbDeviceStepTimeoutError } from "../device/adbTransport";
 import { runRollbackOperation } from "./rollback";
 import type {
   AdbConnectionInfo,
@@ -96,5 +97,24 @@ describe("runRollbackOperation", () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.message).toContain("cleanup failed");
+  });
+
+  it("returns failure when a device-side rollback step times out", async () => {
+    const result = await runRollbackOperation(
+      {
+        transport: new FakeTransport(),
+      },
+      {
+        async cleanupManagedPackages() {},
+        async restoreConfiguredPackages() {
+          throw new AdbDeviceStepTimeoutError("shell pm enable --user 0 humane.ota");
+        },
+        async verifyUninstalledManagedState() {},
+      },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(AdbDeviceStepTimeoutError);
+    expect(result.error?.message).toContain("60000ms");
   });
 });
