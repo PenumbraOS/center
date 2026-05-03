@@ -101,7 +101,7 @@ function getBaseSummary(state: InstallControllerState) {
       copy:
         state.lastOperationResult.result.warnings.length > 0
           ? "Install finished with warnings. Review diagnostics or continue to Center."
-          : "Install finished. Continue to Center or keep inspecting the device.",
+          : "Install finished.",
       progressPercent: 100,
       showProgress: false,
     };
