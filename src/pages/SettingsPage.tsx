@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [geminiGoogleSearch, setGeminiGoogleSearch] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [weatherKey, setWeatherKey] = useState("");
@@ -44,6 +45,7 @@ export default function SettingsPage() {
     setModel(s.llm.model);
     setApiKey("");
     setBaseUrl(s.llm.base_url ?? "");
+    setGeminiGoogleSearch(s.llm.gemini_google_search ?? false);
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
     setWeatherKey("");
@@ -61,8 +63,14 @@ export default function SettingsPage() {
       setBaseUrl(
         next === settings.llm.provider ? (settings.llm.base_url ?? "") : "",
       );
+      setGeminiGoogleSearch(
+        next === "gemini" && next === settings.llm.provider
+          ? (settings.llm.gemini_google_search ?? false)
+          : false,
+      );
     } else {
       setBaseUrl("");
+      setGeminiGoogleSearch(false);
     }
   }
 
@@ -113,6 +121,10 @@ export default function SettingsPage() {
     }
     if (baseUrl !== (settings.llm.base_url ?? "")) {
       llm.base_url = baseUrl;
+      hasChanges = true;
+    }
+    if (geminiGoogleSearch !== (settings.llm.gemini_google_search ?? false)) {
+      llm.gemini_google_search = geminiGoogleSearch;
       hasChanges = true;
     }
     if (Object.keys(llm).length > 0) req.llm = llm;
@@ -231,6 +243,7 @@ export default function SettingsPage() {
   const isDirty = buildRequest() !== null;
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
   const showModelAndKey = provider !== "echo";
+  const showGeminiGoogleSearch = provider === "gemini";
 
   return (
     <>
@@ -363,6 +376,26 @@ export default function SettingsPage() {
                       className="app-form-input"
                     />
                   </label>
+                )}
+
+                {showGeminiGoogleSearch && (
+                  <div className="app-form-field">
+                    <span className="app-form-label">Google Search</span>
+                    <label className="app-form-toggle-row">
+                      <span className="app-form-toggle-copy">
+                        Allow Gemini to use Google Search (may incur additional
+                        costs)
+                      </span>
+                      <input
+                        type="checkbox"
+                        className="app-checkbox"
+                        checked={geminiGoogleSearch}
+                        onChange={(e) =>
+                          setGeminiGoogleSearch(e.target.checked)
+                        }
+                      />
+                    </label>
+                  </div>
                 )}
 
                 {showModelAndKey && (

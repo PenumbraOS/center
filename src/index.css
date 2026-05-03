@@ -1672,11 +1672,25 @@ button.app-button--ghost {
   font-size: 0.95rem;
 }
 
+.app-form-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.app-form-toggle-copy {
+  flex: 1;
+}
+
 .app-checkbox {
+  cursor: pointer;
   appearance: none;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 4px;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
   border: 1px solid var(--color-border-light);
   background: var(--color-surface);
   display: inline-grid;
@@ -1686,9 +1700,9 @@ button.app-button--ghost {
 
 .app-checkbox::after {
   content: "";
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 2px;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 3px;
   transform: scale(0);
   transition: transform var(--transition);
   background: var(--color-beam);

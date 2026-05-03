@@ -38,6 +38,7 @@ export interface Settings {
     model: string;
     has_api_key: boolean;
     base_url?: string;
+    gemini_google_search?: boolean;
   };
   server: {
     port: number;
@@ -61,6 +62,7 @@ export interface UpdateSettingsRequest {
     model?: string;
     api_key?: string;
     base_url?: string;
+    gemini_google_search?: boolean;
   };
   server?: {
     system_prompt?: string;
