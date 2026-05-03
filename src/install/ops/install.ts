@@ -10,6 +10,8 @@ import {
   type ResolvedInstallTarget,
 } from "../releases/assets";
 import type { InstallInspectionResult } from "../domain/inspection";
+import { PREINSTALL_CLEANUP_COMMANDS } from "../domain/knownPackageConflicts";
+import type { KnownPackageConflictCleanupCommand } from "../domain/types";
 import {
   INSTALL_OPERATION_PHASES,
   createOperationProgressEvent,
@@ -49,6 +51,10 @@ export interface InstallOperationInternals {
     target: ResolvedInstallTarget,
     options?: DownloadInstallTargetAssetsOptions,
   ): Promise<DownloadedInstallTargetAssets>;
+  runPreinstallCleanupCommand(
+    transport: AdbSessionTransport,
+    command: KnownPackageConflictCleanupCommand,
+  ): Promise<{ success: boolean; message: string }>;
   cleanupManagedPackages(transport: AdbSessionTransport): Promise<void>;
   bootstrapFinalInstaller(
     transport: AdbSessionTransport,
@@ -87,6 +93,17 @@ export interface InstallOperationInternals {
 
 const defaultInstallInternals: InstallOperationInternals = {
   downloadInstallTargetAssets,
+  async runPreinstallCleanupCommand(transport, command) {
+    const result = await transport.shell(command.argv);
+    return {
+      success: result.exitCode === 0,
+      message:
+        result.stderr.trim() ||
+        result.stdout.trim() ||
+        command.description ||
+        command.argv.join(" "),
+    };
+  },
   cleanupManagedPackages,
   bootstrapFinalInstaller,
   installManagedPackages,
@@ -220,22 +237,64 @@ export async function runInstallOperation(
 
     failedPhase = "Cleanup";
     destructiveWorkStarted = true;
+    const cleanupSteps = PREINSTALL_CLEANUP_COMMANDS.length + 1;
+    let cleanupCompleted = 0;
+    emitProgress({
+      phase: "Cleanup",
+      message: "Running pre-install cleanup.",
+      phaseIndex: 1,
+      phaseCompleted: cleanupCompleted,
+      phaseTotal: cleanupSteps,
+      phaseUnitLabel: "step",
+      logEntry: true,
+    });
+    for (const command of PREINSTALL_CLEANUP_COMMANDS) {
+      emitProgress({
+        phase: "Cleanup",
+        message: `Running pre-install cleanup: ${command.description ?? command.argv.join(" ")}.`,
+        phaseIndex: 1,
+        phaseCompleted: cleanupCompleted,
+        phaseTotal: cleanupSteps,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+      const result = await internals.runPreinstallCleanupCommand(deviceTransport, command);
+      cleanupCompleted += 1;
+      if (!result.success) {
+        warnings.push({
+          code: "preinstall-cleanup-command-failed",
+          message: result.message,
+        });
+      }
+      emitProgress({
+        phase: "Cleanup",
+        message: result.success
+          ? `Pre-install cleanup finished: ${command.description ?? command.argv.join(" ")}.`
+          : `Pre-install cleanup warning: ${result.message}`,
+        phaseIndex: 1,
+        phaseCompleted: cleanupCompleted,
+        phaseTotal: cleanupSteps,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    }
     emitProgress({
       phase: "Cleanup",
       message: "Removing managed packages before reinstall.",
       phaseIndex: 1,
-      phaseCompleted: 0,
-      phaseTotal: 1,
+      phaseCompleted: cleanupCompleted,
+      phaseTotal: cleanupSteps,
       phaseUnitLabel: "step",
       logEntry: true,
     });
     await internals.cleanupManagedPackages(deviceTransport);
+    cleanupCompleted += 1;
     emitProgress({
       phase: "Cleanup",
       message: "Managed package cleanup finished.",
       phaseIndex: 1,
-      phaseCompleted: 1,
-      phaseTotal: 1,
+      phaseCompleted: cleanupCompleted,
+      phaseTotal: cleanupSteps,
       phaseUnitLabel: "step",
       logEntry: true,
     });

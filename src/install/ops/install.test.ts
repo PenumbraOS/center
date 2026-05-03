@@ -242,6 +242,10 @@ describe("runInstallOperation", () => {
             injectorApk: new Blob(["injector"]),
           };
         },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return { success: true, message: command.description ?? command.argv.join(" ") };
+        },
         async cleanupManagedPackages() {
           calls.push("cleanup");
         },
@@ -271,9 +275,21 @@ describe("runInstallOperation", () => {
       },
     );
 
-    expect(calls).toEqual(["assets", "cleanup", "bootstrap", "install", "disable", "configure", "verify"]);
+    expect(calls).toEqual([
+      "assets",
+      "preinstall:hu.ma.ne.ironman",
+      "preinstall:humane.experience.onboarding",
+      "preinstall:humane.experience.systemnavigation",
+      "cleanup",
+      "bootstrap",
+      "install",
+      "disable",
+      "configure",
+      "verify",
+    ]);
     expect(result.success).toBe(true);
     expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.code).toBe("disable-failed");
     expect(result.rollbackAttempted).toBe(false);
     expect(progress).toHaveBeenCalled();
     expect(progress).toHaveBeenCalledWith(
@@ -311,6 +327,10 @@ describe("runInstallOperation", () => {
         async downloadInstallTargetAssets() {
           calls.push("assets");
           throw new Error("download failed");
+        },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return { success: true, message: command.description ?? command.argv.join(" ") };
         },
         async cleanupManagedPackages() {
           calls.push("cleanup");
@@ -362,6 +382,10 @@ describe("runInstallOperation", () => {
             injectorApk: new Blob(["injector"]),
           };
         },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return { success: true, message: command.description ?? command.argv.join(" ") };
+        },
         async cleanupManagedPackages() {
           calls.push("cleanup");
         },
@@ -386,7 +410,17 @@ describe("runInstallOperation", () => {
       },
     );
 
-    expect(calls).toEqual(["assets", "cleanup", "bootstrap", "install", "disable", "configure"]);
+    expect(calls).toEqual([
+      "assets",
+      "preinstall:hu.ma.ne.ironman",
+      "preinstall:humane.experience.onboarding",
+      "preinstall:humane.experience.systemnavigation",
+      "cleanup",
+      "bootstrap",
+      "install",
+      "disable",
+      "configure",
+    ]);
     expect(result.success).toBe(false);
     expect(result.rollbackAttempted).toBe(false);
     expect(result.rollbackSucceeded).toBe(false);
@@ -417,6 +451,10 @@ describe("runInstallOperation", () => {
             injectorApk: new Blob(["injector"]),
           };
         },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return { success: true, message: command.description ?? command.argv.join(" ") };
+        },
         async cleanupManagedPackages() {
           calls.push("cleanup");
         },
@@ -441,7 +479,14 @@ describe("runInstallOperation", () => {
       },
     );
 
-    expect(calls).toEqual(["assets", "cleanup", "bootstrap"]);
+    expect(calls).toEqual([
+      "assets",
+      "preinstall:hu.ma.ne.ironman",
+      "preinstall:humane.experience.onboarding",
+      "preinstall:humane.experience.systemnavigation",
+      "cleanup",
+      "bootstrap",
+    ]);
     expect(result.success).toBe(false);
     expect(result.rollbackAttempted).toBe(false);
     expect(result.rollbackSucceeded).toBe(false);
@@ -470,6 +515,10 @@ describe("runInstallOperation", () => {
             injectorApk: new Blob(["injector"]),
           };
         },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return { success: true, message: command.description ?? command.argv.join(" ") };
+        },
         async cleanupManagedPackages() {
           calls.push("cleanup");
           throw new AdbDeviceStepTimeoutError("shell pm uninstall com.penumbraos.server");
@@ -494,11 +543,75 @@ describe("runInstallOperation", () => {
       },
     );
 
-    expect(calls).toEqual(["assets", "cleanup"]);
+    expect(calls).toEqual([
+      "assets",
+      "preinstall:hu.ma.ne.ironman",
+      "preinstall:humane.experience.onboarding",
+      "preinstall:humane.experience.systemnavigation",
+      "cleanup",
+    ]);
     expect(result.success).toBe(false);
     expect(result.failedPhase).toBe("Cleanup");
     expect(result.rollbackAvailable).toBe(true);
     expect(result.error).toBeInstanceOf(AdbDeviceStepTimeoutError);
     expect(result.error?.message).toContain("60000ms");
+  });
+
+  it("records warning-only failures from pre-install cleanup commands", async () => {
+    const calls: string[] = [];
+    const target = createTarget();
+
+    const result = await runInstallOperation(
+      {
+        transport: new FakeTransport(),
+        target,
+      },
+      {
+        async downloadInstallTargetAssets() {
+          calls.push("assets");
+          return {
+            target,
+            installerApk: new Blob(["installer"]),
+            exploitApk: new Blob(["exploit"]),
+            hookApk: new Blob(["hook"]),
+            serverApk: new Blob(["server"]),
+            injectorApk: new Blob(["injector"]),
+          };
+        },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return {
+            success: command.argv.at(-1) !== "humane.experience.onboarding",
+            message: `${command.argv.at(-1)} cleanup result`,
+          };
+        },
+        async cleanupManagedPackages() {
+          calls.push("cleanup");
+        },
+        async bootstrapFinalInstaller() {
+          calls.push("bootstrap");
+        },
+        async installManagedPackages() {
+          calls.push("install");
+        },
+        async disableConfiguredPackages() {
+          calls.push("disable");
+          return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
+        async verifyInstalledManagedState() {
+          calls.push("verify");
+          return createInspection();
+        },
+      },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.warnings).toContainEqual({
+      code: "preinstall-cleanup-command-failed",
+      message: "humane.experience.onboarding cleanup result",
+    });
   });
 });

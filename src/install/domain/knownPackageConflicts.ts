@@ -9,16 +9,21 @@ import {
 } from "../device/packageManager";
 import type { AdbSessionTransport } from "../device/adbTransport";
 
-const COMMON_CLEANUP_COMMANDS: KnownPackageConflictCleanupCommand[] = [
-  {
-    argv: ["pm", "enable", "--user", "0", "hu.ma.ne.ironman"],
-    description: "Re-enable Humane Ironman",
-  },
-  {
-    argv: ["pm", "enable", "--user", "0", "humane.experience.onboarding"],
-    description: "Re-enable Humane Onboarding",
-  },
-];
+export const PREINSTALL_CLEANUP_COMMANDS: readonly KnownPackageConflictCleanupCommand[] =
+  [
+    {
+      argv: ["pm", "enable", "--user", "0", "hu.ma.ne.ironman"],
+      description: "Re-enable Humane Ironman",
+    },
+    {
+      argv: ["pm", "enable", "--user", "0", "humane.experience.onboarding"],
+      description: "Re-enable Humane Onboarding",
+    },
+    {
+      argv: ["pm", "enable", "--user", "0", "humane.experience.systemnavigation"],
+      description: "Re-enable Humane System Navigation",
+    },
+  ];
 
 export const KNOWN_PACKAGE_CONFLICTS: readonly KnownPackageConflictDefinition[] =
   [
@@ -32,19 +37,16 @@ export const KNOWN_PACKAGE_CONFLICTS: readonly KnownPackageConflictDefinition[] 
         "com.penumbraos.bridge*",
         "com.penumbraos.pinitd",
       ],
-      cleanupCommands: COMMON_CLEANUP_COMMANDS,
     },
     {
       id: "fusionos",
       label: "FusionOS",
       packageIds: ["com.ghost.fuionwebhost", "com.ghost.fusion*"],
-      cleanupCommands: COMMON_CLEANUP_COMMANDS,
     },
     {
       id: "openpin",
       label: "OpenPin",
       packageIds: ["org.openpin.primaryapp"],
-      cleanupCommands: COMMON_CLEANUP_COMMANDS,
     },
   ];
 

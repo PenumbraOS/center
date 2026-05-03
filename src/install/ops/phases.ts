@@ -21,7 +21,8 @@ export type OperationWarningCode =
   | "disable-failed"
   | "restore-failed"
   | "rollback-failed"
-  | "conflict-cleanup-command-failed";
+  | "conflict-cleanup-command-failed"
+  | "preinstall-cleanup-command-failed";
 
 export interface OperationWarning {
   readonly code: OperationWarningCode;
