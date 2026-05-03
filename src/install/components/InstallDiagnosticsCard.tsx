@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatDetectedPackageConflict } from "../domain/knownPackageConflicts";
 import type { InstallControllerState } from "../app/state";
 import {
   createInstallSupportBundleFiles,
@@ -163,6 +164,21 @@ export function InstallDiagnosticsCard({
                 ) : null}
               </div>
             ))}
+          </Section>
+        ) : null}
+
+        {state.inspection?.hasDetectedConflicts ? (
+          <Section title="Known Conflicts">
+            <dl className="install-diagnostics__kv">
+              {state.inspection.detectedConflicts.map((conflict) => (
+                <KvRow
+                  key={conflict.id}
+                  label={conflict.label}
+                  value={formatDetectedPackageConflict(conflict)}
+                  mono
+                />
+              ))}
+            </dl>
           </Section>
         ) : null}
 

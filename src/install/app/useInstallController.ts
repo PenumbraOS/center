@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { formatDetectedPackageConflicts } from "../domain/knownPackageConflicts";
 import { inspectInstallState, type InstallInspectionResult } from "../domain/inspection";
 import { resolveInstallTarget, type ResolvedInstallTarget } from "../releases/assets";
 import {
@@ -10,6 +11,7 @@ import type { AdbSessionTransport } from "../device/adbTransport";
 import { getBrowserSupport } from "../device/browserSupport";
 import { runInstallOperation } from "../ops/install";
 import { runRollbackOperation } from "../ops/rollback";
+import { runRemoveConflictsOperation } from "../ops/removeConflicts";
 import { runUninstallOperation } from "../ops/uninstall";
 import {
   createInitialInstallControllerState,
@@ -35,6 +37,8 @@ export interface InstallController {
   runPrimaryAction(): Promise<void>;
   runRollback(): Promise<void>;
   runUninstall(): Promise<void>;
+  runRemoveConflicts(): Promise<void>;
+  runFixConflictsThenPrimaryAction(): Promise<void>;
   startOver(): Promise<void>;
 }
 
@@ -332,6 +336,258 @@ export function useInstallController(
     }
   }, [ensureTransport, refreshInspection]);
 
+  const runRemoveConflicts = useCallback(async () => {
+    const transport = ensureTransport();
+    const currentState = stateRef.current;
+    const detectedConflicts = currentState.inspection?.detectedConflicts ?? [];
+    const hasConflictCleanupWork = detectedConflicts.some(
+      (conflict) =>
+        conflict.installedPackageIds.length > 0 ||
+        conflict.cleanupCommands.length > 0,
+    );
+
+    if (!hasConflictCleanupWork) {
+      return;
+    }
+
+    dispatch({ type: "operation-started" });
+
+    try {
+      const result = await runRemoveConflictsOperation({
+        transport,
+        conflicts: detectedConflicts,
+        onProgress: (event) => {
+          dispatch({
+            type: "operation-progress",
+            event,
+          });
+        },
+      });
+
+      const nextInspection = await refreshInspection(transport, {
+        target: getActiveTarget(currentState),
+        targetResolutionError: getInspectionTargetResolutionError(
+          currentState.inspection,
+        ),
+      });
+
+      const operationResult: ControllerOperationResult = {
+        kind: "remove-conflicts",
+        result,
+      };
+
+      dispatch({
+        type: "operation-completed",
+        result: operationResult,
+        inspection: nextInspection,
+      });
+    } catch (error) {
+      dispatch({
+        type: "operation-failed",
+        error: toErrorMessage(error),
+      });
+    }
+  }, [ensureTransport, refreshInspection]);
+
+  const runFixConflictsThenPrimaryAction = useCallback(async () => {
+    const transport = ensureTransport();
+    const currentState = stateRef.current;
+    const activeTarget = getActiveTarget(currentState);
+    const detectedConflicts = currentState.inspection?.detectedConflicts ?? [];
+    const hasConflictCleanupWork = detectedConflicts.some(
+      (conflict) =>
+        conflict.installedPackageIds.length > 0 ||
+        conflict.cleanupCommands.length > 0,
+    );
+    let inspectionRefreshInFlight: Promise<void> | null = null;
+
+    if (!activeTarget) {
+      dispatch({
+        type: "operation-failed",
+        error:
+          "Install-type actions are blocked until the installer can resolve a release target.",
+      });
+      return;
+    }
+
+    if (!hasConflictCleanupWork) {
+      await runPrimaryAction();
+      return;
+    }
+
+    dispatch({ type: "operation-started" });
+
+    try {
+      dispatch({
+        type: "operation-progress",
+        event: {
+          phase: "Cleanup",
+          message: "Fixing known conflicts before install.",
+          overallPercent: 0,
+          phasePercent: 0,
+          phaseCompleted: 0,
+          phaseTotal: 1,
+          phaseUnitLabel: "step",
+          bytes: null,
+          logEntry: true,
+        },
+      });
+
+      const conflictResult = await runRemoveConflictsOperation({
+        transport,
+        conflicts: detectedConflicts,
+        onProgress: (event) => {
+          dispatch({
+            type: "operation-progress",
+            event: {
+              ...event,
+              overallPercent: Math.round(event.overallPercent * 0.15),
+            },
+          });
+        },
+      });
+
+      const inspectionAfterConflictCleanup = await refreshInspection(transport, {
+        target: activeTarget,
+        targetResolutionError: getInspectionTargetResolutionError(
+          currentState.inspection,
+        ),
+      });
+
+      if (!conflictResult.success) {
+        dispatch({
+          type: "operation-completed",
+          result: {
+            kind: "install",
+            result: {
+              success: false,
+              warnings: conflictResult.warnings,
+              inspection: null,
+              error:
+                conflictResult.error ??
+                new Error("Failed to remove conflicts before install."),
+              failedPhase: "Cleanup",
+              rollbackAttempted: false,
+              rollbackSucceeded: false,
+              rollbackAvailable: false,
+            },
+          },
+          inspection: inspectionAfterConflictCleanup,
+        });
+        return;
+      }
+
+      if (inspectionAfterConflictCleanup.hasDetectedConflicts) {
+        dispatch({
+          type: "operation-completed",
+          result: {
+            kind: "install",
+            result: {
+              success: false,
+              warnings: conflictResult.warnings,
+              inspection: null,
+              error: new Error(
+                `Known conflicts are still present after cleanup: ${formatDetectedPackageConflicts(
+                  inspectionAfterConflictCleanup.detectedConflicts,
+                )}`,
+              ),
+              failedPhase: "Cleanup",
+              rollbackAttempted: false,
+              rollbackSucceeded: false,
+              rollbackAvailable: false,
+            },
+          },
+          inspection: inspectionAfterConflictCleanup,
+        });
+        return;
+      }
+
+      dispatch({
+        type: "operation-inspection-updated",
+        inspection: inspectionAfterConflictCleanup,
+      });
+
+      dispatch({
+        type: "operation-progress",
+        event: {
+          phase: "Cleanup",
+          message: "Conflict cleanup finished. Continuing with install.",
+          overallPercent: 15,
+          phasePercent: 100,
+          phaseCompleted: 1,
+          phaseTotal: 1,
+          phaseUnitLabel: "step",
+          bytes: null,
+          logEntry: true,
+        },
+      });
+
+      const installResult = await runInstallOperation({
+        transport,
+        target: activeTarget,
+        onProgress: (event) => {
+          dispatch({
+            type: "operation-progress",
+            event: {
+              ...event,
+              overallPercent: Math.min(
+                100,
+                15 + Math.round((event.overallPercent / 100) * 85),
+              ),
+            },
+          });
+
+          if (event.logEntry === false || inspectionRefreshInFlight) {
+            return;
+          }
+
+          inspectionRefreshInFlight = refreshInspection(transport, {
+            target: activeTarget,
+          })
+            .then((inspection) => {
+              dispatch({
+                type: "operation-inspection-updated",
+                inspection,
+              });
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              inspectionRefreshInFlight = null;
+            });
+        },
+      });
+
+      if (inspectionRefreshInFlight) {
+        await inspectionRefreshInFlight;
+      }
+
+      const nextInspection = installResult.inspection
+        ? installResult.inspection
+        : await refreshInspection(transport, {
+            target: activeTarget,
+          });
+
+      const operationResult: ControllerOperationResult = {
+        kind: "install",
+        result: {
+          ...installResult,
+          warnings: [...conflictResult.warnings, ...installResult.warnings],
+        },
+      };
+
+      dispatch({
+        type: "operation-completed",
+        result: operationResult,
+        inspection: nextInspection,
+      });
+    } catch (error) {
+      dispatch({
+        type: "operation-failed",
+        error: toErrorMessage(error),
+      });
+    }
+  }, [ensureTransport, refreshInspection, runPrimaryAction]);
+
   const startOver = useCallback(async () => {
     if (transportRef.current) {
       await transportRef.current.disconnect().catch(() => undefined);
@@ -375,6 +631,8 @@ export function useInstallController(
     runPrimaryAction,
     runRollback,
     runUninstall,
+    runRemoveConflicts,
+    runFixConflictsThenPrimaryAction,
     startOver,
   };
 }

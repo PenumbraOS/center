@@ -48,3 +48,25 @@ export interface InstallActionState {
   warnings: InstallActionWarnings;
   reasons: string[];
 }
+
+export interface KnownPackageConflictCleanupCommand {
+  argv: readonly string[];
+  description?: string;
+}
+
+export interface KnownPackageConflictDefinition {
+  id: string;
+  label: string;
+  packageIds: readonly string[];
+  warningCopy?: string;
+  cleanupCommands?: readonly KnownPackageConflictCleanupCommand[];
+}
+
+export interface DetectedPackageConflict {
+  id: string;
+  label: string;
+  packageIds: readonly string[];
+  installedPackageIds: readonly string[];
+  warningCopy: string | null;
+  cleanupCommands: readonly KnownPackageConflictCleanupCommand[];
+}

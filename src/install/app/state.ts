@@ -4,6 +4,7 @@ import { createDeviceLogLine } from "../device/logStream";
 import type { InstallInspectionResult } from "../domain/inspection";
 import type { InstallOperationResult } from "../ops/install";
 import type { OperationProgressEvent } from "../ops/phases";
+import type { RemoveConflictsOperationResult } from "../ops/removeConflicts";
 import type { UninstallOperationResult } from "../ops/uninstall";
 import type { ResolvedInstallTarget } from "../releases/assets";
 import type { TargetLock } from "../releases/targetLock";
@@ -41,6 +42,10 @@ export type ControllerOperationResult =
   | {
       readonly kind: "uninstall";
       readonly result: UninstallOperationResult;
+    }
+  | {
+      readonly kind: "remove-conflicts";
+      readonly result: RemoveConflictsOperationResult;
     };
 
 export interface InstallProgressEntry {
@@ -90,6 +95,7 @@ export interface InstallControllerCommands {
   readonly primaryAction: InstallActionCommand;
   readonly rollback: InstallActionCommand;
   readonly uninstall: InstallActionCommand;
+  readonly removeConflicts: InstallActionCommand;
   readonly recheck: InstallActionCommand;
   readonly startOver: InstallActionCommand;
   readonly goToCenter: InstallLinkCommand;
@@ -184,6 +190,10 @@ function hasInstalledManagedPackages(inspection: InstallInspectionResult): boole
 
 function hasRemovableManagedState(inspection: InstallInspectionResult): boolean {
   return inspection.helperPresentUnexpectedly || hasInstalledManagedPackages(inspection);
+}
+
+function hasDetectedRemovableConflicts(inspection: InstallInspectionResult): boolean {
+  return inspection.detectedConflicts.some((conflict) => conflict.installedPackageIds.length > 0);
 }
 
 export function isControllerOperationSuccessful(
@@ -356,6 +366,7 @@ export function deriveInstallControllerCommands(
   const hasInspection = state.inspection !== null;
   const resultSuccessful = isControllerOperationSuccessful(state.lastOperationResult);
   const hasRemovableState = state.inspection ? hasRemovableManagedState(state.inspection) : true;
+  const hasDetectedConflicts = state.inspection ? hasDetectedRemovableConflicts(state.inspection) : false;
   const installActionsBlockedReason =
     state.inspection?.installActionsBlockedReason ??
     "Install-type actions are blocked until the installer can resolve a release target.";
@@ -426,14 +437,31 @@ export function deriveInstallControllerCommands(
             ? "Nothing to remove. This device does not currently have managed packages installed."
             : null,
     },
+    removeConflicts: {
+      visible:
+        (hasConnection || hasInspection) &&
+        state.stage !== "operating" &&
+        !(state.stage === "result" && state.lastOperationResult?.kind === "remove-conflicts" && resultSuccessful) &&
+        hasDetectedConflicts,
+      label: "Review and Remove Conflicts",
+      disabled: state.isBusy || !hasConnection || !hasDetectedConflicts,
+      reason: state.isBusy
+        ? "Wait for the current task to finish."
+        : !hasConnection
+          ? "Connect a device before removing conflicts."
+          : !hasDetectedConflicts
+            ? "No known conflicting packages were detected."
+            : null,
+    },
     recheck: {
       visible:
         state.stage === "blocked" ||
         (hasConnection &&
           (state.stage === "error" ||
             (state.stage === "result" &&
-              state.lastOperationResult?.kind === "install" &&
-              !state.lastOperationResult.result.success))),
+              ((state.lastOperationResult?.kind === "install" &&
+                !state.lastOperationResult.result.success) ||
+                state.lastOperationResult?.kind === "remove-conflicts")))),
       label: "Recheck",
       disabled: state.isBusy,
       reason: state.isBusy ? "Wait for the current task to finish." : null,

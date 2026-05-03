@@ -17,7 +17,11 @@ export type InstallOperationPhase = (typeof INSTALL_OPERATION_PHASES)[number];
 export type UninstallOperationPhase = (typeof UNINSTALL_OPERATION_PHASES)[number];
 export type RollbackOperationPhase = (typeof ROLLBACK_OPERATION_PHASES)[number];
 
-export type OperationWarningCode = "disable-failed" | "restore-failed" | "rollback-failed";
+export type OperationWarningCode =
+  | "disable-failed"
+  | "restore-failed"
+  | "rollback-failed"
+  | "conflict-cleanup-command-failed";
 
 export interface OperationWarning {
   readonly code: OperationWarningCode;

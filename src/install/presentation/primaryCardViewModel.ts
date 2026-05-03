@@ -23,6 +23,7 @@ export interface PrimaryCardActionViewModel {
     | "recheck"
     | "goToCenter"
     | "uninstall"
+    | "removeConflicts"
     | "startOver";
   readonly label: string;
   readonly disabled: boolean;
@@ -34,6 +35,8 @@ export interface PrimaryCardPackageRowViewModel {
   readonly role: string;
   readonly value: string;
   readonly tone: "default" | "success" | "warning";
+  readonly category?: "managed" | "conflict";
+  readonly badge?: string | null;
 }
 
 export interface PrimaryCardDeviceViewModel {
@@ -54,6 +57,7 @@ export interface PrimaryCardViewModel {
   readonly showHero: boolean;
   readonly device: PrimaryCardDeviceViewModel | null;
   readonly packageRows: readonly PrimaryCardPackageRowViewModel[];
+  readonly conflictRows: readonly PrimaryCardPackageRowViewModel[];
   readonly primaryAction: PrimaryCardActionViewModel | null;
   readonly secondaryActions: readonly PrimaryCardActionViewModel[];
 }
@@ -131,6 +135,24 @@ function getBaseSummary(state: InstallControllerState) {
         (state.lastOperationResult.result.success
           ? "Managed packages were removed successfully."
           : "The uninstall did not complete."),
+      progressPercent: 100,
+      showProgress: false,
+    };
+  }
+
+  if (
+    state.stage === "result" &&
+    state.lastOperationResult?.kind === "remove-conflicts"
+  ) {
+    return {
+      title: state.lastOperationResult.result.success
+        ? "Conflicts Removed"
+        : "Conflict Removal Failed",
+      copy:
+        state.lastOperationResult.result.error?.message ??
+        (state.lastOperationResult.result.success
+          ? "Known conflicting packages were removed successfully."
+          : "The conflict removal did not complete."),
       progressPercent: 100,
       showProgress: false,
     };
@@ -247,6 +269,17 @@ function getNotice(state: InstallControllerState) {
     };
   }
 
+  if (
+    state.stage === "result" &&
+    state.lastOperationResult?.kind === "remove-conflicts" &&
+    state.lastOperationResult.result.success
+  ) {
+    return {
+      tone: "warning" as const,
+      text: "Known conflicting packages were removed. Review the refreshed device state before continuing.",
+    };
+  }
+
   return null;
 }
 
@@ -257,6 +290,8 @@ function createPlaceholderPackageRow(
     role: formatManagedPackageRole(role),
     value: "Inspecting",
     tone: "default",
+    category: "managed",
+    badge: null,
   };
 }
 
@@ -311,8 +346,26 @@ function getPackageRows(
       role: formatManagedPackageRole(pkg.role),
       value: getCompactPackageValue(pkg),
       tone: getManagedPackageStatusTone(pkg),
+      category: "managed",
+      badge: null,
     };
   });
+}
+
+function getConflictRows(
+  state: InstallControllerState,
+): PrimaryCardPackageRowViewModel[] {
+  if (!state.inspection?.hasDetectedConflicts) {
+    return [];
+  }
+
+  return state.inspection.detectedConflicts.map((conflict) => ({
+    role: conflict.label,
+    value: `${conflict.installedPackageIds.length} package${conflict.installedPackageIds.length === 1 ? "" : "s"}`,
+    tone: "warning",
+    category: "conflict",
+    badge: "Warning",
+  }));
 }
 
 function createActionFromCommand(
@@ -363,6 +416,7 @@ function getSecondaryActions(
   commands: InstallControllerCommands,
 ): PrimaryCardActionViewModel[] {
   return [
+    createActionFromCommand("removeConflicts", commands.removeConflicts),
     createActionFromCommand("uninstall", commands.uninstall),
     commands.recheck.prominent
       ? null
@@ -408,6 +462,7 @@ export function derivePrimaryCardViewModel(
               : null,
           },
     packageRows: state.connection === null ? [] : getPackageRows(state),
+    conflictRows: state.connection === null ? [] : getConflictRows(state),
     primaryAction: getPrimaryAction(commands),
     secondaryActions: getSecondaryActions(commands),
   };

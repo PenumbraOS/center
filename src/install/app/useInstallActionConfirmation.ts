@@ -1,15 +1,24 @@
 import { useCallback, useMemo, useState } from "react";
+import { formatDetectedPackageConflicts } from "../domain/knownPackageConflicts";
 import type { AdbConnectionInfo } from "../device/adbTransport";
-import type { InstallControllerCommands, InstallControllerState } from "./state";
+import type {
+  InstallControllerCommands,
+  InstallControllerState,
+} from "./state";
 
-type PendingAction = "primary" | "rollback" | "uninstall";
+type PendingAction = "primary" | "rollback" | "uninstall" | "remove-conflicts";
+export type InstallConfirmationChoiceAction =
+  | PendingAction
+  | "fix-conflicts-and-install";
 
 type ConfirmationRequirementKind =
   | "risk"
   | "unsupported-device"
   | "rollback"
   | "uninstall"
-  | "newer-than-target";
+  | "newer-than-target"
+  | "known-conflicts"
+  | "remove-conflicts";
 
 export interface InstallConfirmationRequirement {
   readonly kind: ConfirmationRequirementKind;
@@ -17,11 +26,18 @@ export interface InstallConfirmationRequirement {
   readonly description: string;
 }
 
+export interface InstallConfirmationChoice {
+  readonly action: InstallConfirmationChoiceAction;
+  readonly label: string;
+  readonly tone: "primary" | "secondary";
+  readonly recommended?: boolean;
+}
+
 export interface InstallConfirmationDialog {
   readonly action: PendingAction;
   readonly title: string;
   readonly body: string;
-  readonly confirmLabel: string;
+  readonly choices: readonly InstallConfirmationChoice[];
   readonly requirements: readonly InstallConfirmationRequirement[];
 }
 
@@ -30,11 +46,14 @@ export interface InstallActionConfirmation {
   requestPrimaryAction(): Promise<void>;
   requestRollback(): Promise<void>;
   requestUninstall(): Promise<void>;
+  requestRemoveConflicts(): Promise<void>;
   dismissDialog(): void;
-  confirmDialog(): Promise<void>;
+  confirmDialog(action: InstallConfirmationChoiceAction): Promise<void>;
 }
 
-function buildConnectionSessionKey(connection: AdbConnectionInfo | null): string | null {
+function buildConnectionSessionKey(
+  connection: AdbConnectionInfo | null,
+): string | null {
   if (!connection) {
     return null;
   }
@@ -49,9 +68,9 @@ function getPrimaryActionLabel(state: InstallControllerState): string {
 function createRiskRequirement(): InstallConfirmationRequirement {
   return {
     kind: "risk",
-    title: "Risk Acknowledgement",
+    title: "Danger",
     description:
-      "This action will modify system packages on the connected device. Continue only if you want the installer to change device state.",
+      "This action will modify key system components on the connected device and may have unintended consequences.",
   };
 }
 
@@ -91,7 +110,37 @@ function createNewerThanTargetRequirement(): InstallConfirmationRequirement {
   };
 }
 
-function createDialogForAction(options: {
+function createKnownConflictsRequirement(
+  state: InstallControllerState,
+): InstallConfirmationRequirement {
+  const formattedConflicts = formatDetectedPackageConflicts(
+    state.inspection?.detectedConflicts ?? [],
+  );
+
+  return {
+    kind: "known-conflicts",
+    title: "Installation Conflicts",
+    description:
+      "The device has conflicting packages left over from other Ai Pin projects. These may cause issues with the installed system. Removal is recommended, but you may continue without removing them.\n\n" +
+      formattedConflicts,
+  };
+}
+
+function createRemoveConflictsRequirement(
+  state: InstallControllerState,
+): InstallConfirmationRequirement {
+  const formattedConflicts = formatDetectedPackageConflicts(
+    state.inspection?.detectedConflicts ?? [],
+  );
+
+  return {
+    kind: "remove-conflicts",
+    title: "Conflict Cleanup",
+    description: `Known conflicting packages will be removed from the device.\n\n${formattedConflicts}`,
+  };
+}
+
+export function createDialogForAction(options: {
   action: PendingAction;
   state: InstallControllerState;
   riskAcknowledged: boolean;
@@ -100,7 +149,11 @@ function createDialogForAction(options: {
   const requirements: InstallConfirmationRequirement[] = [];
   const primaryActionLabel = getPrimaryActionLabel(options.state);
   const unsupportedDevice =
-    options.state.inspection !== null && !options.state.inspection.device.recognizedAiPin;
+    options.state.inspection !== null &&
+    !options.state.inspection.device.recognizedAiPin;
+  const hasKnownConflicts =
+    options.action === "primary" &&
+    Boolean(options.state.inspection?.hasDetectedConflicts);
 
   if (!options.riskAcknowledged) {
     requirements.push(createRiskRequirement());
@@ -118,34 +171,86 @@ function createDialogForAction(options: {
     requirements.push(createUninstallRequirement());
   }
 
-  if (options.action === "primary" && options.state.inspection?.actionState.warnings.newerThanTarget) {
+  if (options.action === "remove-conflicts") {
+    requirements.push(createRemoveConflictsRequirement(options.state));
+  }
+
+  if (
+    options.action === "primary" &&
+    options.state.inspection?.actionState.warnings.newerThanTarget
+  ) {
     requirements.push(createNewerThanTargetRequirement());
+  }
+
+  if (hasKnownConflicts) {
+    requirements.push(createKnownConflictsRequirement(options.state));
   }
 
   if (requirements.length === 0) {
     return null;
   }
 
+  if (hasKnownConflicts) {
+    return {
+      action: options.action,
+      title: "Conflicts Detected",
+      body: "We found packages from other Ai Pin projects that may interfere with installation. You can remove the known conflicts before installing, or continue without removing them.",
+      choices: [
+        {
+          action: "primary",
+          label: `${primaryActionLabel} Anyway`,
+          tone: "secondary",
+        },
+        {
+          action: "fix-conflicts-and-install",
+          label: `Remove and ${primaryActionLabel}`,
+          tone: "primary",
+          recommended: true,
+        },
+      ],
+      requirements,
+    };
+  }
+
   return {
     action: options.action,
     title:
-      requirements.length === 1 && requirements[0].kind === "uninstall"
-        ? options.action === "rollback"
-          ? "Confirm Rollback"
-          : "Confirm Uninstall"
-        : "Review Before Continuing",
+      options.action === "rollback" &&
+      requirements.length === 1 &&
+      requirements[0].kind === "rollback"
+        ? "Confirm Rollback"
+        : options.action === "uninstall" &&
+            requirements.length === 1 &&
+            requirements[0].kind === "uninstall"
+          ? "Confirm Uninstall"
+          : options.action === "remove-conflicts" &&
+              requirements.length === 1 &&
+              requirements[0].kind === "remove-conflicts"
+            ? "Review Conflict Cleanup"
+            : "Review",
     body:
       options.action === "primary"
         ? `Review the following before continuing with ${primaryActionLabel}.`
         : options.action === "rollback"
           ? "Review the following before continuing with rollback."
-          : "Review the following before continuing with uninstall.",
-    confirmLabel:
-      options.action === "primary"
-        ? `Continue with ${primaryActionLabel}`
-        : options.action === "rollback"
-          ? "Continue with Rollback"
-          : "Continue with Uninstall",
+          : options.action === "remove-conflicts"
+            ? "Review the following before removing detected conflicts."
+            : "Review the following before continuing with uninstall.",
+    choices: [
+      {
+        action: options.action,
+        label:
+          options.action === "primary"
+            ? `Continue with ${primaryActionLabel}`
+            : options.action === "rollback"
+              ? "Continue with Rollback"
+              : options.action === "remove-conflicts"
+                ? "Remove Conflicts"
+                : "Continue with Uninstall",
+        tone: "primary",
+        recommended: true,
+      },
+    ],
     requirements,
   };
 }
@@ -156,40 +261,96 @@ export function useInstallActionConfirmation(options: {
   runPrimaryAction: () => Promise<void>;
   runRollback: () => Promise<void>;
   runUninstall: () => Promise<void>;
+  runRemoveConflicts: () => Promise<void>;
+  runFixConflictsThenPrimaryAction: () => Promise<void>;
 }): InstallActionConfirmation {
-  const { state, commands, runPrimaryAction, runRollback, runUninstall } = options;
+  const {
+    state,
+    commands,
+    runPrimaryAction,
+    runRollback,
+    runUninstall,
+    runRemoveConflicts,
+    runFixConflictsThenPrimaryAction,
+  } = options;
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
-  const [confirmedUnsupportedSessionKey, setConfirmedUnsupportedSessionKey] = useState<string | null>(null);
+  const [confirmedUnsupportedSessionKey, setConfirmedUnsupportedSessionKey] =
+    useState<string | null>(null);
   const [dialog, setDialog] = useState<InstallConfirmationDialog | null>(null);
 
-  const currentSessionKey = useMemo(() => buildConnectionSessionKey(state.connection), [state.connection]);
+  const currentSessionKey = useMemo(
+    () => buildConnectionSessionKey(state.connection),
+    [state.connection],
+  );
   const unsupportedDeviceConfirmedForSession =
-    currentSessionKey !== null && confirmedUnsupportedSessionKey === currentSessionKey;
+    currentSessionKey !== null &&
+    confirmedUnsupportedSessionKey === currentSessionKey;
 
   const effectiveDialog = useMemo(() => {
     if (!dialog) {
       return null;
     }
 
-    if (dialog.action === "primary" && (!commands.primaryAction.visible || commands.primaryAction.disabled)) {
+    if (
+      dialog.action === "primary" &&
+      (!commands.primaryAction.visible || commands.primaryAction.disabled)
+    ) {
       return null;
     }
 
-    if (dialog.action === "rollback" && (!commands.rollback.visible || commands.rollback.disabled)) {
+    if (
+      dialog.action === "rollback" &&
+      (!commands.rollback.visible || commands.rollback.disabled)
+    ) {
       return null;
     }
 
-    if (dialog.action === "uninstall" && (!commands.uninstall.visible || commands.uninstall.disabled)) {
+    if (
+      dialog.action === "uninstall" &&
+      (!commands.uninstall.visible || commands.uninstall.disabled)
+    ) {
+      return null;
+    }
+
+    if (
+      dialog.action === "remove-conflicts" &&
+      (!commands.removeConflicts.visible || commands.removeConflicts.disabled)
+    ) {
       return null;
     }
 
     return dialog;
-  }, [commands.primaryAction.disabled, commands.primaryAction.visible, commands.rollback.disabled, commands.rollback.visible, commands.uninstall.disabled, commands.uninstall.visible, dialog]);
+  }, [
+    commands.primaryAction.disabled,
+    commands.primaryAction.visible,
+    commands.removeConflicts.disabled,
+    commands.removeConflicts.visible,
+    commands.rollback.disabled,
+    commands.rollback.visible,
+    commands.uninstall.disabled,
+    commands.uninstall.visible,
+    dialog,
+  ]);
 
   const executeAction = useCallback(
-    async (action: PendingAction) => {
+    async (action: InstallConfirmationChoiceAction) => {
+      if (action === "fix-conflicts-and-install") {
+        if (
+          !commands.primaryAction.visible ||
+          commands.primaryAction.disabled
+        ) {
+          return;
+        }
+
+        await runFixConflictsThenPrimaryAction();
+        return;
+      }
+
       if (action === "primary") {
-        if (!commands.primaryAction.visible || commands.primaryAction.disabled) {
+        if (
+          !commands.primaryAction.visible ||
+          commands.primaryAction.disabled
+        ) {
           return;
         }
 
@@ -206,13 +367,39 @@ export function useInstallActionConfirmation(options: {
         return;
       }
 
+      if (action === "remove-conflicts") {
+        if (
+          !commands.removeConflicts.visible ||
+          commands.removeConflicts.disabled
+        ) {
+          return;
+        }
+
+        await runRemoveConflicts();
+        return;
+      }
+
       if (!commands.uninstall.visible || commands.uninstall.disabled) {
         return;
       }
 
       await runUninstall();
     },
-    [commands.primaryAction.disabled, commands.primaryAction.visible, commands.rollback.disabled, commands.rollback.visible, commands.uninstall.disabled, commands.uninstall.visible, runPrimaryAction, runRollback, runUninstall],
+    [
+      commands.primaryAction.disabled,
+      commands.primaryAction.visible,
+      commands.removeConflicts.disabled,
+      commands.removeConflicts.visible,
+      commands.rollback.disabled,
+      commands.rollback.visible,
+      commands.uninstall.disabled,
+      commands.uninstall.visible,
+      runFixConflictsThenPrimaryAction,
+      runPrimaryAction,
+      runRemoveConflicts,
+      runRollback,
+      runUninstall,
+    ],
   );
 
   const requestPrimaryAction = useCallback(async () => {
@@ -296,37 +483,81 @@ export function useInstallActionConfirmation(options: {
     unsupportedDeviceConfirmedForSession,
   ]);
 
+  const requestRemoveConflicts = useCallback(async () => {
+    if (
+      !commands.removeConflicts.visible ||
+      commands.removeConflicts.disabled
+    ) {
+      return;
+    }
+
+    const nextDialog = createDialogForAction({
+      action: "remove-conflicts",
+      state,
+      riskAcknowledged,
+      unsupportedDeviceConfirmedForSession,
+    });
+
+    if (nextDialog) {
+      setDialog(nextDialog);
+      return;
+    }
+
+    await executeAction("remove-conflicts");
+  }, [
+    commands.removeConflicts.disabled,
+    commands.removeConflicts.visible,
+    executeAction,
+    riskAcknowledged,
+    state,
+    unsupportedDeviceConfirmedForSession,
+  ]);
+
   const dismissDialog = useCallback(() => {
     setDialog(null);
   }, []);
 
-  const confirmDialog = useCallback(async () => {
-    if (!effectiveDialog) {
-      return;
-    }
+  const confirmDialog = useCallback(
+    async (action: InstallConfirmationChoiceAction) => {
+      if (!effectiveDialog) {
+        return;
+      }
 
-    const activeDialog = effectiveDialog;
-    setDialog(null);
+      if (!effectiveDialog.choices.some((choice) => choice.action === action)) {
+        return;
+      }
 
-    if (activeDialog.requirements.some((requirement) => requirement.kind === "risk")) {
-      setRiskAcknowledged(true);
-    }
+      const activeDialog = effectiveDialog;
+      setDialog(null);
 
-    if (
-      activeDialog.requirements.some((requirement) => requirement.kind === "unsupported-device") &&
-      currentSessionKey
-    ) {
-      setConfirmedUnsupportedSessionKey(currentSessionKey);
-    }
+      if (
+        activeDialog.requirements.some(
+          (requirement) => requirement.kind === "risk",
+        )
+      ) {
+        setRiskAcknowledged(true);
+      }
 
-    await executeAction(activeDialog.action);
-  }, [currentSessionKey, effectiveDialog, executeAction]);
+      if (
+        activeDialog.requirements.some(
+          (requirement) => requirement.kind === "unsupported-device",
+        ) &&
+        currentSessionKey
+      ) {
+        setConfirmedUnsupportedSessionKey(currentSessionKey);
+      }
+
+      await executeAction(action);
+    },
+    [currentSessionKey, effectiveDialog, executeAction],
+  );
 
   return {
     dialog: effectiveDialog,
     requestPrimaryAction,
     requestRollback,
     requestUninstall,
+    requestRemoveConflicts,
     dismissDialog,
     confirmDialog,
   };

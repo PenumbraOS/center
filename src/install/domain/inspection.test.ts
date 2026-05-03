@@ -142,6 +142,16 @@ function createShellHandlers(overrides: Partial<Record<string, ShellResult>> = {
     "getprop ro.product.model": { stdout: "Ai Pin\n", stderr: "", exitCode: 0 },
     "getprop ro.product.device": { stdout: "mako\n", stderr: "", exitCode: 0 },
     "getprop ro.build.fingerprint": { stdout: "humane/fingerprint\n", stderr: "", exitCode: 0 },
+    "pm list packages": {
+      stdout: [
+        "package:com.penumbraos.systeminjector",
+        "package:com.penumbraos.hook",
+        "package:com.penumbraos.server",
+        "package:com.penumbraos.hook.injector",
+      ].join("\n"),
+      stderr: "",
+      exitCode: 0,
+    },
     "pm list packages com.penumbraos.systeminjector": {
       stdout: "package:com.penumbraos.systeminjector\n",
       stderr: "",
@@ -261,5 +271,60 @@ describe("inspectInstallState", () => {
     expect(result.actionState.action).toBe("Reinstall");
     expect(result.installActionsBlocked).toBe(true);
     expect(result.installActionsBlockedReason).toContain("GitHub unreachable");
+  });
+
+  it("detects known conflicting package groups by wildcard package ID patterns", async () => {
+    const result = await inspectInstallState(
+      new FakeTransport(
+        createShellHandlers({
+          "pm list packages": {
+            stdout: [
+              "package:com.penumbraos.server",
+              "package:conflict.one",
+              "package:conflict.two.alpha",
+              "package:conflict.three",
+            ].join("\n"),
+            stderr: "",
+            exitCode: 0,
+          },
+        }),
+      ),
+      {
+        target: createTarget(),
+        readinessSettleDelayMs: 0,
+        knownPackageConflicts: [
+          {
+            id: "legacy-suite",
+            label: "Legacy Suite",
+            packageIds: ["conflict.one", "conflict.two*"],
+            cleanupCommands: [],
+          },
+          {
+            id: "other-suite",
+            label: "Other Suite",
+            packageIds: ["conflict.three"],
+            cleanupCommands: [
+              {
+                argv: ["pm", "clear", "conflict.three"],
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(result.hasDetectedConflicts).toBe(true);
+    expect(result.detectedConflicts).toEqual([
+      expect.objectContaining({
+        id: "legacy-suite",
+        installedPackageIds: ["conflict.one", "conflict.two.alpha"],
+        cleanupCommands: [],
+      }),
+      expect.objectContaining({
+        id: "other-suite",
+        installedPackageIds: ["conflict.three"],
+        cleanupCommands: [{ argv: ["pm", "clear", "conflict.three"] }],
+      }),
+    ]);
   });
 });

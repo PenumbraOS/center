@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   hasExactPackageLine,
+  matchesPackagePattern,
+  parseInstalledPackageNames,
   parseVersionNameFromDumpsys,
 } from "./packageManager";
 
@@ -22,6 +24,27 @@ describe("hasExactPackageLine", () => {
   });
 });
 
+describe("parseInstalledPackageNames", () => {
+  it("extracts package names from pm list packages output", () => {
+    expect(
+      parseInstalledPackageNames([
+        "package:com.penumbraos.server",
+        "package:com.penumbraos.hook",
+        "garbage",
+      ].join("\n")),
+    ).toEqual(["com.penumbraos.server", "com.penumbraos.hook"]);
+  });
+});
+
+describe("matchesPackagePattern", () => {
+  it("supports wildcard-only package pattern matching", () => {
+    expect(matchesPackagePattern("com.penumbraos.plugins.alpha", "com.penumbraos.plugins.*")).toBe(true);
+    expect(matchesPackagePattern("com.penumbraos.bridge2", "com.penumbraos.bridge*")).toBe(true);
+    expect(matchesPackagePattern("com.penumbraos.sdk.alpha.beta", "com.penumbraos.sdk.*")).toBe(true);
+    expect(matchesPackagePattern("com.penumbraos.plugin.alpha", "com.penumbraos.plugins.*")).toBe(false);
+  });
+});
+
 describe("parseVersionNameFromDumpsys", () => {
   it("extracts versionName from dumpsys output", () => {
     expect(
@@ -37,5 +60,4 @@ describe("parseVersionNameFromDumpsys", () => {
   it("returns null when versionName is not present", () => {
     expect(parseVersionNameFromDumpsys("no version here")).toBeNull();
   });
-}
-);
+});

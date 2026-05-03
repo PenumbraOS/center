@@ -194,6 +194,8 @@ function createInspection(): InstallInspectionResult {
         versionComparison: "equal",
       },
     },
+    detectedConflicts: [],
+    hasDetectedConflicts: false,
     actionState: {
       action: "Reinstall",
       warnings: {

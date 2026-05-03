@@ -1,5 +1,24 @@
 import { useEffect, useRef } from "react";
-import type { InstallConfirmationDialog } from "../app/useInstallActionConfirmation";
+import type {
+  InstallConfirmationChoiceAction,
+  InstallConfirmationDialog,
+  InstallConfirmationRequirement,
+} from "../app/useInstallActionConfirmation";
+
+function getRequirementToneClass(requirement: InstallConfirmationRequirement) {
+  if (requirement.kind === "risk") {
+    return "install-dialog__requirement--danger";
+  }
+
+  if (
+    requirement.kind === "known-conflicts" ||
+    requirement.kind === "remove-conflicts"
+  ) {
+    return "install-dialog__requirement--warning";
+  }
+
+  return "";
+}
 
 export function ConfirmActionModal({
   dialog,
@@ -8,7 +27,7 @@ export function ConfirmActionModal({
 }: {
   dialog: InstallConfirmationDialog | null;
   onCancel: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (action: InstallConfirmationChoiceAction) => void | Promise<void>;
 }) {
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -61,9 +80,16 @@ export function ConfirmActionModal({
         {dialog.requirements.length > 0 ? (
           <ul className="install-dialog__requirements">
             {dialog.requirements.map((requirement) => (
-              <li key={requirement.kind} className="install-dialog__requirement">
-                <h3 className="install-dialog__requirement-title">{requirement.title}</h3>
-                <p className="install-dialog__requirement-copy">{requirement.description}</p>
+              <li
+                key={requirement.kind}
+                className={`install-dialog__requirement ${getRequirementToneClass(requirement)}`.trim()}
+              >
+                <h3 className="install-dialog__requirement-title">
+                  {requirement.title}
+                </h3>
+                <p className="install-dialog__requirement-copy">
+                  {requirement.description}
+                </p>
               </li>
             ))}
           </ul>
@@ -77,16 +103,19 @@ export function ConfirmActionModal({
           >
             Cancel
           </button>
-          <button
-            ref={confirmButtonRef}
-            type="button"
-            className="install-dialog__button install-dialog__button--primary"
-            onClick={() => {
-              void onConfirm();
-            }}
-          >
-            {dialog.confirmLabel}
-          </button>
+          {dialog?.choices?.map((choice) => (
+            <button
+              key={`${choice.action}-${choice.label}`}
+              ref={!!choice.recommended ? confirmButtonRef : undefined}
+              type="button"
+              className={`install-dialog__button install-dialog__button--${choice.tone}`}
+              onClick={() => {
+                void onConfirm(choice.action);
+              }}
+            >
+              {choice.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

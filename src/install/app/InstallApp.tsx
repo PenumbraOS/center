@@ -26,6 +26,9 @@ export default function InstallAppV1() {
     runPrimaryAction: controller.runPrimaryAction,
     runRollback: controller.runRollback,
     runUninstall: controller.runUninstall,
+    runRemoveConflicts: controller.runRemoveConflicts,
+    runFixConflictsThenPrimaryAction:
+      controller.runFixConflictsThenPrimaryAction,
   });
 
   return (
@@ -43,6 +46,9 @@ export default function InstallAppV1() {
               }}
               onUninstall={() => {
                 void confirmation.requestUninstall();
+              }}
+              onRemoveConflicts={() => {
+                void confirmation.requestRemoveConflicts();
               }}
             />
             <InstallDiagnosticsCard state={controller.state} />

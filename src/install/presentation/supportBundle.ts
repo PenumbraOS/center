@@ -14,7 +14,7 @@ interface SerializedError {
 }
 
 interface SerializedOperationResult {
-  readonly kind: "install" | "uninstall";
+  readonly kind: "install" | "uninstall" | "remove-conflicts";
   readonly result: {
     readonly success: boolean;
     readonly warnings: readonly unknown[];
@@ -23,6 +23,7 @@ interface SerializedOperationResult {
     readonly rollbackAttempted?: boolean;
     readonly rollbackSucceeded?: boolean;
     readonly rollbackAvailable?: boolean;
+    readonly removedPackageIds?: readonly string[];
   };
 }
 
@@ -97,6 +98,8 @@ function serializeOperationResult(
       success: result.result.success,
       warnings: result.result.warnings,
       error: serializeError(result.result.error),
+      removedPackageIds:
+        "removedPackageIds" in result.result ? result.result.removedPackageIds : undefined,
     },
   };
 }

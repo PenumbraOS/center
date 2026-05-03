@@ -42,10 +42,30 @@ export function parseVersionNameFromDumpsys(output: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function parseInstalledPackageNames(output: string): string[] {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim().match(/^package:(.+)$/)?.[1] ?? null)
+    .filter((packageName): packageName is string => packageName !== null);
+}
+
+export function matchesPackagePattern(packageName: string, pattern: string): boolean {
+  const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const regexPattern = `^${escapedPattern.replace(/\*/g, ".*")}$`;
+  return new RegExp(regexPattern).test(packageName);
+}
+
 function ensureShellSuccess(result: ShellResult, fallbackMessage: string) {
   if (result.exitCode !== 0) {
     throw new Error(result.stderr.trim() || result.stdout.trim() || fallbackMessage);
   }
+}
+
+export async function listInstalledPackages(
+  transport: AdbSessionTransport,
+): Promise<string[]> {
+  const result = await transport.shell(["pm", "list", "packages"]);
+  return parseInstalledPackageNames(result.stdout);
 }
 
 export async function packageExists(

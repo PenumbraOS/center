@@ -1,3 +1,4 @@
+import { formatDetectedPackageConflicts } from "../domain/knownPackageConflicts";
 import type { InstallControllerState, InstallControllerStage } from "../app/state";
 import { STAGE_LABELS } from "../app/state";
 
@@ -51,6 +52,9 @@ export function InstallStatusCard({
   const showNewerWarning = state.inspection?.actionState.warnings.newerThanTarget ?? false;
   const showUnreadableWarning = state.inspection?.actionState.warnings.unreadableVersion ?? false;
   const unreadablePackageRoles = getUnreadablePackageRoles(state);
+  const knownConflictsText = state.inspection?.hasDetectedConflicts
+    ? formatDetectedPackageConflicts(state.inspection.detectedConflicts)
+    : "";
   const currentProgress = state.currentProgress;
 
   return (
@@ -117,6 +121,13 @@ export function InstallStatusCard({
         <div className="app-notice app-notice--warning">
           One or more installed package versions are unreadable, so the next install-type action
           will converge the device back to a known state. Affected packages: {unreadablePackageRoles.join(", ") || "unknown"}. See Device state and Technical details below.
+        </div>
+      ) : null}
+
+      {state.inspection?.hasDetectedConflicts ? (
+        <div className="app-notice app-notice--warning">
+          Known conflicting packages were detected: {knownConflictsText}. You can remove them now
+          or continue with install anyway.
         </div>
       ) : null}
     </section>

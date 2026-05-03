@@ -1,4 +1,5 @@
 import { deriveInstallActionState } from "./actionState";
+import { detectKnownPackageConflicts } from "./knownPackageConflicts";
 import { getDeviceIdentity, type DeviceIdentity } from "../device/deviceIdentity";
 import {
   MANAGED_PACKAGES,
@@ -11,7 +12,9 @@ import {
 } from "../device/readiness";
 import { classifyInstalledVersion } from "./versions";
 import type {
+  DetectedPackageConflict,
   InstallActionState,
+  KnownPackageConflictDefinition,
   ManagedPackageInspection,
   ManagedPackageRole,
 } from "./types";
@@ -39,6 +42,8 @@ export interface InstallInspectionResult {
   readonly helperPresentUnexpectedly: boolean;
   readonly readiness: DeviceReadinessResult;
   readonly packages: Record<ManagedPackageRole, ManagedPackageVersionSnapshot>;
+  readonly detectedConflicts: readonly DetectedPackageConflict[];
+  readonly hasDetectedConflicts: boolean;
   readonly actionState: InstallActionState;
   readonly installActionsBlocked: boolean;
   readonly installActionsBlockedReason: string | null;
@@ -91,13 +96,14 @@ export async function inspectInstallState(
     target?: ResolvedInstallTarget | null;
     targetResolutionError?: Error | null;
     readinessSettleDelayMs?: number;
+    knownPackageConflicts?: readonly KnownPackageConflictDefinition[];
   },
 ): Promise<InstallInspectionResult> {
   const target = options?.target ?? null;
   const targetResolutionError = options?.targetResolutionError ?? null;
   const device = await getDeviceIdentity(transport);
 
-  const [installerMetadata, hookMetadata, serverMetadata, injectorMetadata, helperMetadata, readiness] =
+  const [installerMetadata, hookMetadata, serverMetadata, injectorMetadata, helperMetadata, readiness, detectedConflicts] =
     await Promise.all([
       getInstalledPackageMetadata(transport, MANAGED_PACKAGES.installer),
       getInstalledPackageMetadata(transport, MANAGED_PACKAGES.hook),
@@ -114,6 +120,7 @@ export async function inspectInstallState(
         ],
         options?.readinessSettleDelayMs,
       ),
+      detectKnownPackageConflicts(transport, options?.knownPackageConflicts),
     ]);
 
   const packages: Record<ManagedPackageRole, ManagedPackageVersionSnapshot> = {
@@ -148,6 +155,7 @@ export async function inspectInstallState(
   };
 
   const helperPresentUnexpectedly = helperMetadata !== null;
+  const hasDetectedConflicts = detectedConflicts.length > 0;
   const actionState = deriveInstallActionState({
     packages,
     helperPresentUnexpectedly,
@@ -168,6 +176,8 @@ export async function inspectInstallState(
     helperPresentUnexpectedly,
     readiness,
     packages,
+    detectedConflicts,
+    hasDetectedConflicts,
     actionState,
     installActionsBlocked,
     installActionsBlockedReason,
