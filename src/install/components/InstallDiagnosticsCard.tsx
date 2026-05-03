@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { formatDetectedPackageConflict } from "../domain/knownPackageConflicts";
-import type { InstallControllerState } from "../app/state";
+import type { InstallController } from "../app/useInstallController";
 import {
   createInstallSupportBundleFiles,
   downloadSupportBundleFile,
@@ -56,12 +56,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function InstallDiagnosticsCard({
-  state,
+  controller,
 }: {
-  state: InstallControllerState;
+  controller: InstallController;
 }) {
+  const { state } = controller;
   const packages = getManagedPackageSnapshots(state.inspection);
-  const supportFiles = createInstallSupportBundleFiles(state);
+  const supportFiles = createInstallSupportBundleFiles(state, controller);
   const isError = state.stage === "error";
 
   return (
@@ -98,9 +99,11 @@ export function InstallDiagnosticsCard({
                   key={file.fileName}
                   type="button"
                   className="install-diagnostics__download"
-                  onClick={() => downloadSupportBundleFile(file)}
+                  onClick={() => {
+                    void downloadSupportBundleFile(file);
+                  }}
                 >
-                  {file.fileName}
+                  {file.label ?? file.fileName}
                 </button>
               ))}
             </div>

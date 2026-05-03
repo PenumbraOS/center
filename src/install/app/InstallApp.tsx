@@ -51,7 +51,7 @@ export default function InstallAppV1() {
                 void confirmation.requestRemoveConflicts();
               }}
             />
-            <InstallDiagnosticsCard state={controller.state} />
+            <InstallDiagnosticsCard controller={controller} />
           </div>
         </section>
         <ConfirmActionModal

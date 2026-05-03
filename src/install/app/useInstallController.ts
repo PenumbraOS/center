@@ -44,6 +44,7 @@ export interface InstallController {
   runUninstall(): Promise<void>;
   runRemoveConflicts(): Promise<void>;
   runFixConflictsThenPrimaryAction(): Promise<void>;
+  getLogcatContent(): Promise<string>;
   startOver(): Promise<void>;
 }
 
@@ -697,6 +698,12 @@ export function useInstallController(
     }
   }, [ensureTransport, refreshInspection, runPrimaryAction]);
 
+  const getLogcatContent = useCallback(async () => {
+    const transport = ensureTransport();
+    const result = await transport.shell(["logcat", "-d"]);
+    return result.stdout;
+  }, [ensureTransport]);
+
   const startOver = useCallback(async () => {
     if (transportRef.current) {
       await transportRef.current.disconnect().catch(() => undefined);
@@ -742,6 +749,7 @@ export function useInstallController(
     runUninstall,
     runRemoveConflicts,
     runFixConflictsThenPrimaryAction,
+    getLogcatContent,
     startOver,
   };
 }

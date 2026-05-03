@@ -1,10 +1,12 @@
+import type { InstallController } from "../app/useInstallController";
 import type { InstallControllerState } from "../app/state";
 import { getManagedPackageSnapshots } from "./managedPackages";
 
 export interface SupportBundleFile {
   readonly fileName: string;
-  readonly content: string;
+  readonly label?: string;
   readonly mimeType: string;
+  readonly download: () => Promise<string>;
 }
 
 interface SerializedError {
@@ -104,8 +106,8 @@ function serializeOperationResult(
   };
 }
 
-export function downloadSupportBundleFile(file: SupportBundleFile) {
-  const blob = new Blob([file.content], { type: file.mimeType });
+export async function downloadSupportBundleFile(file: SupportBundleFile) {
+  const blob = new Blob([await file.download()], { type: file.mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -167,18 +169,25 @@ export function createInstallSupportBundle(
 
 export function createInstallSupportBundleFiles(
   state: InstallControllerState,
+  controller: Pick<InstallController, "getLogcatContent">,
 ): SupportBundleFile[] {
   const bundle = createInstallSupportBundle(state);
   const files: SupportBundleFile[] = [
     {
+      fileName: "penumbra-logcat.log",
+      label: "Logcat Logs",
+      mimeType: "text/plain",
+      download: controller.getLogcatContent,
+    },
+    {
       fileName: "install-support-bundle.json",
-      content: `${JSON.stringify(bundle, null, 2)}\n`,
       mimeType: "application/json",
+      download: async () => `${JSON.stringify(bundle, null, 2)}\n`,
     },
     {
       fileName: "progress-log.txt",
-      content: createProgressLogText(state),
       mimeType: "text/plain",
+      download: async () => createProgressLogText(state),
     },
   ];
 
@@ -189,8 +198,8 @@ export function createInstallSupportBundleFiles(
 
     files.push({
       fileName: `package-${pkg.role}-dumpsys.txt`,
-      content: `${pkg.rawOutput}\n`,
       mimeType: "text/plain",
+      download: async () => `${pkg.rawOutput}\n`,
     });
   }
 
