@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   hasExactPackageLine,
   matchesPackagePattern,
   parseInstalledPackageNames,
   parseVersionNameFromDumpsys,
+  setHomeActivity,
 } from "./packageManager";
 
 describe("hasExactPackageLine", () => {
@@ -59,5 +60,52 @@ describe("parseVersionNameFromDumpsys", () => {
 
   it("returns null when versionName is not present", () => {
     expect(parseVersionNameFromDumpsys("no version here")).toBeNull();
+  });
+});
+
+describe("setHomeActivity", () => {
+  it("retries twice before succeeding", async () => {
+    vi.useFakeTimers();
+
+    const shell = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "first failure" })
+      .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "second failure" })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: "", stderr: "" });
+    const transport = { shell };
+
+    const operation = setHomeActivity(transport as never);
+    await vi.advanceTimersByTimeAsync(400);
+    await operation;
+
+    expect(shell).toHaveBeenCalledTimes(3);
+    expect(shell).toHaveBeenNthCalledWith(1, [
+      "cmd",
+      "package",
+      "set-home-activity",
+      "humane.experience.systemnavigation/humaneinternal.system.ipc.HumaneExperienceActivity",
+    ]);
+
+    vi.useRealTimers();
+  });
+
+  it("throws after exhausting retries", async () => {
+    vi.useFakeTimers();
+
+    const shell = vi
+      .fn()
+      .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "first failure" })
+      .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "second failure" })
+      .mockResolvedValueOnce({ exitCode: 1, stdout: "", stderr: "final failure" });
+    const transport = { shell };
+
+    const operation = setHomeActivity(transport as never);
+    const rejection = expect(operation).rejects.toThrow("final failure");
+    await vi.advanceTimersByTimeAsync(400);
+
+    await rejection;
+    expect(shell).toHaveBeenCalledTimes(3);
+
+    vi.useRealTimers();
   });
 });

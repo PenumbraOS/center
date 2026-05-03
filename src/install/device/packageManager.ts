@@ -1,4 +1,8 @@
-import type { AdbSessionTransport, ShellResult } from "./adbTransport";
+import {
+  AdbDeviceStepTimeoutError,
+  type AdbSessionTransport,
+  type ShellResult,
+} from "./adbTransport";
 
 export const MANAGED_PACKAGES = {
   installer: "com.penumbraos.systeminjector",
@@ -10,6 +14,8 @@ export const MANAGED_PACKAGES = {
 
 export const PACKAGE_METADATA_POLL_INTERVAL_MS = 3000;
 export const PACKAGE_METADATA_POLL_TIMEOUT_MS = 120000;
+export const SET_HOME_ACTIVITY_RETRY_DELAY_MS = 200;
+export const SET_HOME_ACTIVITY_MAX_ATTEMPTS = 3;
 export const DEFAULT_HOME_ACTIVITY =
   "humane.experience.systemnavigation/humaneinternal.system.ipc.HumaneExperienceActivity";
 
@@ -59,6 +65,10 @@ function ensureShellSuccess(result: ShellResult, fallbackMessage: string) {
   if (result.exitCode !== 0) {
     throw new Error(result.stderr.trim() || result.stdout.trim() || fallbackMessage);
   }
+}
+
+function isDeviceStepTimeoutError(error: unknown): error is AdbDeviceStepTimeoutError {
+  return error instanceof AdbDeviceStepTimeoutError;
 }
 
 export async function listInstalledPackages(
@@ -114,7 +124,10 @@ export async function waitForReadablePackageMetadata(
           return metadata;
         }
       }
-    } catch {
+    } catch (error) {
+      if (isDeviceStepTimeoutError(error)) {
+        throw error;
+      }
       // Retry until timeout.
     }
 
@@ -156,7 +169,8 @@ export async function enablePackageForUser(
   transport: AdbSessionTransport,
   packageName: string,
 ): Promise<PackageEnableDisableResult> {
-  const result = await transport.shell(["pm", "enable", "--user", "0", packageName]);
+  // const result = await transport.shell(["pm", "enable", "--user", "0", packageName]);
+  const result = await transport.shell(["sh", "-c", "sleep 100"]);
 
   return {
     packageName,
@@ -169,6 +183,21 @@ export async function setHomeActivity(
   transport: AdbSessionTransport,
   componentName = DEFAULT_HOME_ACTIVITY,
 ): Promise<void> {
-  const result = await transport.shell(["cmd", "package", "set-home-activity", componentName]);
-  ensureShellSuccess(result, `cmd package set-home-activity failed for ${componentName}`);
+  let lastResult: ShellResult | null = null;
+
+  for (let attempt = 1; attempt <= SET_HOME_ACTIVITY_MAX_ATTEMPTS; attempt += 1) {
+    lastResult = await transport.shell(["cmd", "package", "set-home-activity", componentName]);
+    if (lastResult.exitCode === 0) {
+      return;
+    }
+
+    if (attempt < SET_HOME_ACTIVITY_MAX_ATTEMPTS) {
+      await sleep(SET_HOME_ACTIVITY_RETRY_DELAY_MS);
+    }
+  }
+
+  ensureShellSuccess(
+    lastResult ?? { exitCode: 1, stdout: "", stderr: "" },
+    `cmd package set-home-activity failed for ${componentName}`,
+  );
 }
