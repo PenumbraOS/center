@@ -320,31 +320,6 @@ export default function SettingsPage() {
                     className="app-form-textarea"
                   />
                 </label>
-
-                <div className="app-kv app-kv--compact">
-                  <div className="app-kv-item">
-                    <dt>Port</dt>
-                    <dd className="app-value">
-                      {settings.server.port}
-                      <span className="app-readonly-note">
-                        {" "}
-                        (requires restart)
-                      </span>
-                    </dd>
-                  </div>
-                  {settings.server.public_addr && (
-                    <div className="app-kv-item">
-                      <dt>Public Address</dt>
-                      <dd className="app-mono">
-                        {settings.server.public_addr}
-                        <span className="app-readonly-note">
-                          {" "}
-                          (requires restart)
-                        </span>
-                      </dd>
-                    </div>
-                  )}
-                </div>
               </section>
 
               <section className="app-form-card">
