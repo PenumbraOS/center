@@ -213,7 +213,7 @@ export default function SettingsPage() {
       }
 
       downloadTextFile(
-        kind === "server" ? "humane-server.log" : "android-logcat.log",
+        kind === "server" ? "humane-server.log" : "penumbra-logcat.log",
         result.text,
       );
       logInfo("settings-page", "Logs downloaded", {
