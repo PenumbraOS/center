@@ -20,8 +20,18 @@ export const PREINSTALL_CLEANUP_COMMANDS: readonly KnownPackageConflictCleanupCo
       description: "Re-enable Humane Onboarding",
     },
     {
-      argv: ["pm", "enable", "--user", "0", "humane.experience.systemnavigation"],
+      argv: [
+        "pm",
+        "enable",
+        "--user",
+        "0",
+        "humane.experience.systemnavigation",
+      ],
       description: "Re-enable Humane System Navigation",
+    },
+    {
+      argv: [`setprop persist.log.tag ""`],
+      description: "Remove PenumbraOS v0 expanded logging",
     },
   ];
 
