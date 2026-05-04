@@ -35,6 +35,13 @@ export const PREINSTALL_CLEANUP_COMMANDS: readonly KnownPackageConflictCleanupCo
     },
   ];
 
+const SHARED_CLEANUP_COMMANDS: readonly KnownPackageConflictCleanupCommand[] = [
+  {
+    argv: ["reboot"],
+    description: "Reboot device",
+  },
+];
+
 export const KNOWN_PACKAGE_CONFLICTS: readonly KnownPackageConflictDefinition[] =
   [
     {
@@ -47,16 +54,19 @@ export const KNOWN_PACKAGE_CONFLICTS: readonly KnownPackageConflictDefinition[] 
         "com.penumbraos.bridge*",
         "com.penumbraos.pinitd",
       ],
+      cleanupCommands: SHARED_CLEANUP_COMMANDS,
     },
     {
       id: "fusionos",
       label: "FusionOS",
       packageIds: ["com.ghost.fuionwebhost", "com.ghost.fusion*"],
+      cleanupCommands: SHARED_CLEANUP_COMMANDS,
     },
     {
       id: "openpin",
       label: "OpenPin",
       packageIds: ["org.openpin.primaryapp"],
+      cleanupCommands: SHARED_CLEANUP_COMMANDS,
     },
   ];
 
