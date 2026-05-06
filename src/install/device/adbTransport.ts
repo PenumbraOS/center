@@ -42,6 +42,14 @@ export interface CommandStreamController {
   stop(): Promise<void>;
 }
 
+export interface AdbPtySession {
+  readonly output: ReadableStream<Uint8Array>;
+  readonly exited: Promise<number>;
+  write(data: Uint8Array): Promise<void>;
+  sigint(): Promise<void>;
+  close(): Promise<void>;
+}
+
 export interface AdbSessionTransport {
   readonly connectionInfo: AdbConnectionInfo | null;
   connect(): Promise<AdbConnectionInfo>;
@@ -55,6 +63,7 @@ export interface AdbSessionTransport {
   ): Promise<ShellResult>;
   pushFile(remotePath: string, file: Blob): Promise<void>;
   reboot(): Promise<void>;
+  openPty(): Promise<AdbPtySession>;
   startCommandStream(
     command: string | readonly string[],
     onLine: (line: CommandStreamLine) => void,
@@ -179,6 +188,9 @@ export function createTimedAdbSessionTransport(
     reboot() {
       return withDeviceStepTimeout("reboot", () => transport.reboot(), timeoutMs);
     },
+    openPty() {
+      return transport.openPty();
+    },
     startCommandStream(command, onLine) {
       return transport.startCommandStream(command, onLine);
     },
@@ -249,6 +261,7 @@ export class WebUsbAdbSessionTransport implements AdbSessionTransport {
   private currentStreamHandler: ((line: CommandStreamLine) => void) | null =
     null;
   private currentStreamCommand: string | readonly string[] | null = null;
+  private currentPtySession: AdbPtySession | null = null;
 
   constructor(options: WebUsbAdbSessionTransportOptions) {
     this.authStrategy = options.authStrategy;
@@ -355,6 +368,7 @@ export class WebUsbAdbSessionTransport implements AdbSessionTransport {
   }
 
   async disconnect(): Promise<void> {
+    await this.stopCurrentPty();
     await this.stopCurrentStream();
     if (this.adb) {
       await this.adb.close();
@@ -487,6 +501,46 @@ export class WebUsbAdbSessionTransport implements AdbSessionTransport {
     this.markOperationSuccess();
   }
 
+  async openPty(): Promise<AdbPtySession> {
+    const adb = this.requireAdb();
+    const shell = adb.subprocess.shellProtocol;
+
+    if (!shell) {
+      throw new Error("Shell protocol is not supported by this device.");
+    }
+
+    await this.stopCurrentPty();
+
+    const process = await shell.pty({ terminalType: "xterm-256color" });
+    const writer = process.input.getWriter();
+
+    const session: AdbPtySession = {
+      output: process.output,
+      exited: process.exited,
+      write: async (data) => {
+        await writer.write(data);
+      },
+      sigint: async () => {
+        await process.sigint();
+      },
+      close: async () => {
+        try {
+          await Promise.resolve(process.kill()).catch(() => undefined);
+        } finally {
+          writer.releaseLock();
+          await process.output.cancel().catch(() => undefined);
+          if (this.currentPtySession === session) {
+            this.currentPtySession = null;
+          }
+        }
+      },
+    };
+
+    this.currentPtySession = session;
+    this.markOperationSuccess();
+    return session;
+  }
+
   async startCommandStream(
     command: string | readonly string[],
     onLine: (line: CommandStreamLine) => void,
@@ -603,6 +657,14 @@ export class WebUsbAdbSessionTransport implements AdbSessionTransport {
           error,
         });
       });
+  }
+
+  private async stopCurrentPty() {
+    const session = this.currentPtySession;
+    this.currentPtySession = null;
+    if (session) {
+      await session.close().catch(() => undefined);
+    }
   }
 
   private async stopCurrentStream() {

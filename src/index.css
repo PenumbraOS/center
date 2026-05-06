@@ -1246,6 +1246,21 @@ button {
   margin: 0;
 }
 
+.install-terminal__viewport-wrap {
+  width: 100%;
+  align-self: stretch;
+  min-height: 230px;
+  background: #000;
+  padding: var(--space-sm);
+  overflow: auto;
+  text-align: left;
+}
+
+.install-terminal__viewport {
+  min-height: 306px;
+  text-align: left;
+}
+
 /* ---------- Confirmation dialog ---------- */
 
 .install-dialog {

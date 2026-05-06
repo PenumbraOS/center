@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { getDeviceIdentity } from "./deviceIdentity";
-import type { AdbSessionTransport, AdbConnectionInfo, CommandStreamController, CommandStreamLine, ShellResult } from "./adbTransport";
+import type {
+  AdbConnectionInfo,
+  AdbPtySession,
+  AdbSessionTransport,
+  CommandStreamController,
+  CommandStreamLine,
+  ShellResult,
+} from "./adbTransport";
 
 class FakeTransport implements AdbSessionTransport {
   readonly connectionInfo: AdbConnectionInfo | null = {
@@ -45,6 +52,10 @@ class FakeTransport implements AdbSessionTransport {
   }
 
   async reboot(): Promise<void> {
+    throw new Error("not implemented");
+  }
+
+  async openPty(): Promise<AdbPtySession> {
     throw new Error("not implemented");
   }
 

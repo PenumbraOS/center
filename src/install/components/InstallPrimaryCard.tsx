@@ -14,6 +14,7 @@ function runAction(options: {
   onRollback: () => void;
   onUninstall: () => void;
   onRemoveConflicts: () => void;
+  onOpenTerminal: () => void;
 }) {
   const {
     action,
@@ -22,6 +23,7 @@ function runAction(options: {
     onRollback,
     onUninstall,
     onRemoveConflicts,
+    onOpenTerminal,
   } = options;
 
   if (action.disabled) {
@@ -40,6 +42,11 @@ function runAction(options: {
 
   if (action.key === "installApkFile") {
     void controller.runInstallApkFile();
+    return;
+  }
+
+  if (action.key === "openTerminal") {
+    onOpenTerminal();
     return;
   }
 
@@ -75,6 +82,7 @@ function PrimaryButton({
   onRollback,
   onUninstall,
   onRemoveConflicts,
+  onOpenTerminal,
 }: {
   action: PrimaryCardActionViewModel;
   controller: InstallController;
@@ -82,6 +90,7 @@ function PrimaryButton({
   onRollback: () => void;
   onUninstall: () => void;
   onRemoveConflicts: () => void;
+  onOpenTerminal: () => void;
 }) {
   if (action.href) {
     return (
@@ -103,6 +112,7 @@ function PrimaryButton({
           onRollback,
           onUninstall,
           onRemoveConflicts,
+          onOpenTerminal,
         })
       }
       disabled={action.disabled}
@@ -120,6 +130,7 @@ function SecondaryLink({
   onRollback,
   onUninstall,
   onRemoveConflicts,
+  onOpenTerminal,
 }: {
   action: PrimaryCardActionViewModel;
   controller: InstallController;
@@ -127,6 +138,7 @@ function SecondaryLink({
   onRollback: () => void;
   onUninstall: () => void;
   onRemoveConflicts: () => void;
+  onOpenTerminal: () => void;
 }) {
   if (action.href) {
     return (
@@ -148,6 +160,7 @@ function SecondaryLink({
           onRollback,
           onUninstall,
           onRemoveConflicts,
+          onOpenTerminal,
         })
       }
       disabled={action.disabled}
@@ -164,12 +177,14 @@ export function InstallPrimaryCard({
   onRollback,
   onUninstall,
   onRemoveConflicts,
+  onOpenTerminal,
 }: {
   controller: InstallController;
   onPrimaryAction: () => void;
   onRollback: () => void;
   onUninstall: () => void;
   onRemoveConflicts: () => void;
+  onOpenTerminal: () => void;
 }) {
   const viewModel = derivePrimaryCardViewModel(
     controller.state,
@@ -177,7 +192,7 @@ export function InstallPrimaryCard({
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const showConnectionHelp = viewModel.primaryAction?.key === "connect";
-  const { overflowAction } = viewModel;
+  const { overflowActions } = viewModel;
 
   return (
     <section className="install-stage" aria-labelledby="install-stage-title">
@@ -308,6 +323,7 @@ export function InstallPrimaryCard({
               onRollback={onRollback}
               onUninstall={onUninstall}
               onRemoveConflicts={onRemoveConflicts}
+              onOpenTerminal={onOpenTerminal}
             />
           ) : null}
         </div>
@@ -315,7 +331,7 @@ export function InstallPrimaryCard({
         <div className="install-stage__links-slot">
           {viewModel.secondaryActions.length > 0 ||
           showConnectionHelp ||
-          overflowAction ? (
+          overflowActions.length > 0 ? (
             <div className="install-stage__links-wrap">
               <nav className="install-stage__links" aria-label="More Actions">
                 {viewModel.secondaryActions.map((action) => (
@@ -327,6 +343,7 @@ export function InstallPrimaryCard({
                       onRollback={onRollback}
                       onUninstall={onUninstall}
                       onRemoveConflicts={onRemoveConflicts}
+                      onOpenTerminal={onOpenTerminal}
                     />
                   </span>
                 ))}
@@ -342,17 +359,18 @@ export function InstallPrimaryCard({
                   </span>
                 ) : null}
               </nav>
-              {overflowAction ? (
+              {overflowActions.length > 0 ? (
                 <OverflowMenu
-                  action={overflowAction}
-                  onAction={() =>
+                  actions={overflowActions}
+                  onAction={(action) =>
                     runAction({
-                      action: overflowAction,
+                      action,
                       controller,
                       onPrimaryAction,
                       onRollback,
                       onUninstall,
                       onRemoveConflicts,
+                      onOpenTerminal,
                     })
                   }
                 />

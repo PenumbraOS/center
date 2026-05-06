@@ -20,6 +20,7 @@ export interface PrimaryCardActionViewModel {
     | "connect"
     | "primaryAction"
     | "installApkFile"
+    | "openTerminal"
     | "rollback"
     | "recheck"
     | "goToCenter"
@@ -59,7 +60,7 @@ export interface PrimaryCardViewModel {
   readonly device: PrimaryCardDeviceViewModel | null;
   readonly packageRows: readonly PrimaryCardPackageRowViewModel[];
   readonly conflictRows: readonly PrimaryCardPackageRowViewModel[];
-  readonly overflowAction: PrimaryCardActionViewModel | null;
+  readonly overflowActions: readonly PrimaryCardActionViewModel[];
   readonly primaryAction: PrimaryCardActionViewModel | null;
   readonly secondaryActions: readonly PrimaryCardActionViewModel[];
 }
@@ -411,8 +412,22 @@ function createActionFromLink(
   };
 }
 
-function getOverflowAction(commands: InstallControllerCommands) {
-  return createActionFromCommand("installApkFile", commands.installApkFile);
+function getOverflowActions(
+  state: InstallControllerState,
+  commands: InstallControllerCommands,
+) {
+  return [
+    createActionFromCommand("installApkFile", commands.installApkFile),
+    state.connection
+      ? {
+          key: "openTerminal" as const,
+          label: "Terminal",
+          disabled: state.isBusy,
+          reason: state.isBusy ? "Wait for the current task to finish." : null,
+          href: null,
+        }
+      : null,
+  ].filter((action): action is PrimaryCardActionViewModel => action !== null);
 }
 
 function getPrimaryAction(commands: InstallControllerCommands) {
@@ -476,7 +491,7 @@ export function derivePrimaryCardViewModel(
           },
     packageRows: state.connection === null ? [] : getPackageRows(state),
     conflictRows: state.connection === null ? [] : getConflictRows(state),
-    overflowAction: getOverflowAction(commands),
+    overflowActions: getOverflowActions(state, commands),
     primaryAction: getPrimaryAction(commands),
     secondaryActions: getSecondaryActions(commands),
   };

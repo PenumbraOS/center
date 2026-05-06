@@ -10,6 +10,7 @@ import {
 import {
   AdbDeviceStepTimeoutError,
   createTimedAdbSessionTransport,
+  type AdbPtySession,
   type AdbSessionTransport,
 } from "../device/adbTransport";
 import { getBrowserSupport } from "../device/browserSupport";
@@ -19,6 +20,7 @@ import { runRollbackOperation } from "../ops/rollback";
 import { runRemoveConflictsOperation } from "../ops/removeConflicts";
 import { runUninstallOperation } from "../ops/uninstall";
 import { runInstallApkFileOperation } from "./runInstallApkFile";
+import { useBeforeUnload } from "../../hooks/useBeforeUnload";
 import {
   createInitialInstallControllerState,
   deriveInstallControllerCommands,
@@ -47,6 +49,7 @@ export interface InstallController {
   runRemoveConflicts(): Promise<void>;
   runFixConflictsThenPrimaryAction(): Promise<void>;
   getLogcatContent(): Promise<string>;
+  openTerminalSession(): Promise<AdbPtySession>;
   startOver(): Promise<void>;
 }
 
@@ -718,6 +721,12 @@ export function useInstallController(
     return result.stdout;
   }, [ensureTransport]);
 
+  const openTerminalSession = useCallback(async () => {
+    const transport = ensureTransport();
+    await transport.connect();
+    return transport.openPty();
+  }, [ensureTransport]);
+
   const startOver = useCallback(async () => {
     if (transportRef.current) {
       await transportRef.current.disconnect().catch(() => undefined);
@@ -735,21 +744,7 @@ export function useInstallController(
     };
   }, []);
 
-  useEffect(() => {
-    if (state.stage !== "operating") {
-      return undefined;
-    }
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [state.stage]);
+  useBeforeUnload(state.stage === "operating");
 
   const commands = useMemo(() => deriveInstallControllerCommands(state), [state]);
 
@@ -765,6 +760,7 @@ export function useInstallController(
     runRemoveConflicts,
     runFixConflictsThenPrimaryAction,
     getLogcatContent,
+    openTerminalSession,
     startOver,
   };
 }

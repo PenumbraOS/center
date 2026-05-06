@@ -4,6 +4,7 @@ import { runInstallOperation } from "./install";
 import type { ResolvedInstallTarget } from "../releases/assets";
 import type {
   AdbConnectionInfo,
+  AdbPtySession,
   AdbSessionTransport,
   CommandStreamController,
   CommandStreamLine,
@@ -40,6 +41,10 @@ class FakeTransport implements AdbSessionTransport {
   }
 
   async reboot(): Promise<void> {
+    throw new Error("not implemented");
+  }
+
+  async openPty(): Promise<AdbPtySession> {
     throw new Error("not implemented");
   }
 

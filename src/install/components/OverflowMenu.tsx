@@ -2,14 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import type { PrimaryCardActionViewModel } from "../presentation/primaryCardViewModel";
 
 export function OverflowMenu({
-  action,
+  actions,
   onAction,
 }: {
-  action: PrimaryCardActionViewModel;
-  onAction: () => void;
+  actions: readonly PrimaryCardActionViewModel[];
+  onAction: (action: PrimaryCardActionViewModel) => void;
 }) {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement | null>(null);
+  const triggerDisabled = actions.every((action) => action.disabled);
+  const triggerReason = actions.find((action) => action.reason)?.reason ?? undefined;
+
+  useEffect(() => {
+    if (triggerDisabled && overflowOpen) {
+      setOverflowOpen(false);
+    }
+  }, [triggerDisabled, overflowOpen]);
 
   useEffect(() => {
     if (!overflowOpen) {
@@ -45,7 +53,8 @@ export function OverflowMenu({
         aria-label="More tools"
         aria-haspopup="menu"
         aria-expanded={overflowOpen}
-        title={action.reason ?? action.label}
+        disabled={triggerDisabled}
+        title={triggerReason}
       >
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path
@@ -56,19 +65,22 @@ export function OverflowMenu({
       </button>
       {overflowOpen ? (
         <div className="install-stage__overflow-menu" role="menu" aria-label="More tools">
-          <button
-            type="button"
-            className="install-stage__overflow-item"
-            onClick={() => {
-              setOverflowOpen(false);
-              onAction();
-            }}
-            disabled={action.disabled}
-            title={action.reason ?? undefined}
-            role="menuitem"
-          >
-            {action.label}
-          </button>
+          {actions.map((action) => (
+            <button
+              key={action.key}
+              type="button"
+              className="install-stage__overflow-item"
+              onClick={() => {
+                setOverflowOpen(false);
+                onAction(action);
+              }}
+              disabled={action.disabled}
+              title={action.reason ?? undefined}
+              role="menuitem"
+            >
+              {action.label}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
