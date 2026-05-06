@@ -246,6 +246,13 @@ function getNotice(state: InstallControllerState) {
     };
   }
 
+  if (state.inspection?.readiness.credentialState.state === "locked") {
+    return {
+      tone: "warning" as const,
+      text: `Device is locked. Unlock the device, then press "Start Over".`,
+    };
+  }
+
   if (
     state.stage === "result" &&
     state.lastOperationResult?.kind === "install" &&

@@ -370,6 +370,7 @@ export function deriveInstallControllerCommands(
   const installActionsBlockedReason =
     state.inspection?.installActionsBlockedReason ??
     "Install-type actions are blocked until the installer can resolve a release target.";
+  const deviceCredentialLocked = state.inspection?.readiness.credentialState.state === "locked";
 
   return {
     connect: {
@@ -397,14 +398,17 @@ export function deriveInstallControllerCommands(
       disabled:
         state.isBusy ||
         !hasInspection ||
-        Boolean(state.inspection?.installActionsBlocked),
+        Boolean(state.inspection?.installActionsBlocked) ||
+        deviceCredentialLocked,
       reason: state.isBusy
         ? "Wait for the current task to finish."
         : !hasInspection
           ? "Connect a device and inspect its state first."
           : state.inspection.installActionsBlocked
             ? installActionsBlockedReason
-            : null,
+            : deviceCredentialLocked
+              ? `Device is locked. Unlock the device, then press "Start Over".`
+              : null,
     },
     rollback: {
       visible:

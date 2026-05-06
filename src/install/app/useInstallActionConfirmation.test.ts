@@ -32,6 +32,10 @@ function createState(overrides: Partial<InstallControllerState> = {}): InstallCo
         packageQueryabilityOk: true,
         settleDelayMs: 0,
         packageResults: [],
+        credentialState: {
+          state: "unknown",
+          ceAvailableRaw: null,
+        },
       },
       packages: {
         installer: {

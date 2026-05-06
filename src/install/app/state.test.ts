@@ -39,6 +39,10 @@ function createState(overrides: Partial<InstallControllerState> = {}): InstallCo
         packageQueryabilityOk: true,
         settleDelayMs: 0,
         packageResults: [],
+        credentialState: {
+          state: "unknown",
+          ceAvailableRaw: null,
+        },
       },
       packages: {
         installer: {
@@ -115,6 +119,26 @@ function createState(overrides: Partial<InstallControllerState> = {}): InstallCo
 }
 
 describe("deriveInstallControllerCommands", () => {
+  it("disables the primary action when CE availability is not confirmed", () => {
+    const commands = deriveInstallControllerCommands(
+      createState({
+        inspection: {
+          ...createState().inspection!,
+          readiness: {
+            ...createState().inspection!.readiness,
+            credentialState: {
+              state: "locked",
+              ceAvailableRaw: null,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(commands.primaryAction.disabled).toBe(true);
+    expect(commands.primaryAction.reason).toBe(`Device is locked. Unlock the device, then press "Start Over".`);
+  });
+
   it("shows remove-conflicts action when known conflicts are detected", () => {
     const commands = deriveInstallControllerCommands(
       createState({

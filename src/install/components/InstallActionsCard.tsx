@@ -14,7 +14,11 @@ function commandReason(
 
   if (commands.primaryAction.visible && commands.primaryAction.reason) {
     return {
-      tone: state.inspection?.installActionsBlocked ? "warning" : "info",
+      tone:
+        state.inspection?.installActionsBlocked ||
+        state.inspection?.readiness.credentialState.state === "locked"
+          ? "warning"
+          : "info",
       text: commands.primaryAction.reason,
     };
   }

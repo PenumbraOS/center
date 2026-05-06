@@ -32,6 +32,10 @@ function createState(overrides: Partial<InstallControllerState> = {}): InstallCo
         packageQueryabilityOk: true,
         settleDelayMs: 0,
         packageResults: [],
+        credentialState: {
+          state: "unknown",
+          ceAvailableRaw: null,
+        },
       },
       packages: {
         installer: {
@@ -144,6 +148,29 @@ function createCommands(): InstallControllerCommands {
 }
 
 describe("derivePrimaryCardViewModel", () => {
+  it("shows a lock warning when CE availability is not confirmed", () => {
+    const viewModel = derivePrimaryCardViewModel(
+      createState({
+        inspection: {
+          ...createState().inspection!,
+          readiness: {
+            ...createState().inspection!.readiness,
+            credentialState: {
+              state: "locked",
+              ceAvailableRaw: null,
+            },
+          },
+        },
+      }),
+      createCommands(),
+    );
+
+    expect(viewModel.notice).toEqual({
+      tone: "warning",
+      text: `Device is locked. Unlock the device, then press "Start Over".`,
+    });
+  });
+
   it("surfaces detected conflicts inline with the package rows", () => {
     const viewModel = derivePrimaryCardViewModel(createState(), createCommands());
 
