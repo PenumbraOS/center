@@ -19,6 +19,7 @@ export interface PrimaryCardActionViewModel {
   readonly key:
     | "connect"
     | "primaryAction"
+    | "installApkFile"
     | "rollback"
     | "recheck"
     | "goToCenter"
@@ -58,6 +59,7 @@ export interface PrimaryCardViewModel {
   readonly device: PrimaryCardDeviceViewModel | null;
   readonly packageRows: readonly PrimaryCardPackageRowViewModel[];
   readonly conflictRows: readonly PrimaryCardPackageRowViewModel[];
+  readonly overflowAction: PrimaryCardActionViewModel | null;
   readonly primaryAction: PrimaryCardActionViewModel | null;
   readonly secondaryActions: readonly PrimaryCardActionViewModel[];
 }
@@ -409,6 +411,10 @@ function createActionFromLink(
   };
 }
 
+function getOverflowAction(commands: InstallControllerCommands) {
+  return createActionFromCommand("installApkFile", commands.installApkFile);
+}
+
 function getPrimaryAction(commands: InstallControllerCommands) {
   return (
     createActionFromCommand("rollback", commands.rollback) ??
@@ -470,6 +476,7 @@ export function derivePrimaryCardViewModel(
           },
     packageRows: state.connection === null ? [] : getPackageRows(state),
     conflictRows: state.connection === null ? [] : getConflictRows(state),
+    overflowAction: getOverflowAction(commands),
     primaryAction: getPrimaryAction(commands),
     secondaryActions: getSecondaryActions(commands),
   };

@@ -284,6 +284,7 @@ describe("runInstallOperation", () => {
       "preinstall:hu.ma.ne.ironman",
       "preinstall:humane.experience.onboarding",
       "preinstall:humane.experience.systemnavigation",
+      "preinstall:setprop persist.log.tag \"\"",
       "cleanup",
       "bootstrap",
       "install",
@@ -419,6 +420,7 @@ describe("runInstallOperation", () => {
       "preinstall:hu.ma.ne.ironman",
       "preinstall:humane.experience.onboarding",
       "preinstall:humane.experience.systemnavigation",
+      "preinstall:setprop persist.log.tag \"\"",
       "cleanup",
       "bootstrap",
       "install",
@@ -488,6 +490,7 @@ describe("runInstallOperation", () => {
       "preinstall:hu.ma.ne.ironman",
       "preinstall:humane.experience.onboarding",
       "preinstall:humane.experience.systemnavigation",
+      "preinstall:setprop persist.log.tag \"\"",
       "cleanup",
       "bootstrap",
     ]);
@@ -552,6 +555,7 @@ describe("runInstallOperation", () => {
       "preinstall:hu.ma.ne.ironman",
       "preinstall:humane.experience.onboarding",
       "preinstall:humane.experience.systemnavigation",
+      "preinstall:setprop persist.log.tag \"\"",
       "cleanup",
     ]);
     expect(result.success).toBe(false);

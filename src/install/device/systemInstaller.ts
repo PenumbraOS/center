@@ -54,6 +54,10 @@ export interface StageSystemApkInstallOptions {
   readonly onProgress?: (event: SystemInstallerProgressEvent) => void;
 }
 
+export interface StageSystemApkInstallResult {
+  readonly message: string | null;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
@@ -70,6 +74,34 @@ function ensureShellSuccess(result: ShellResult, fallback: string) {
   if (result.exitCode !== 0 || hasProviderAccessError(output)) {
     throw new Error(result.stderr || result.stdout || fallback);
   }
+}
+
+function extractProviderMessage(output: string): string | null {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const directMatch = line.match(/^message=(.+)$/);
+    if (directMatch) {
+      return directMatch[1]?.trim() ?? null;
+    }
+
+    const bundleMatch = line.match(/message=([^}\]]+)/);
+    if (bundleMatch) {
+      return bundleMatch[1]?.trim() ?? null;
+    }
+  }
+
+  return null;
+}
+
+function hasEmptyProviderBundle(output: string): boolean {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .some((line) => line === "Result: Bundle[{}]");
 }
 
 function shellSingleQuote(value: string): string {
@@ -366,7 +398,7 @@ export async function stageSystemApkInstall(
   apk: Blob,
   name: string,
   options: StageSystemApkInstallOptions = {},
-): Promise<void> {
+): Promise<StageSystemApkInstallResult> {
   options.onProgress?.({
     step: "install-wait-installer",
     message: `Waiting for installer package readiness before staging ${name}.`,
@@ -415,6 +447,37 @@ export async function stageSystemApkInstall(
   ]);
   ensureShellSuccess(installResult, `Failed to trigger install for ${name}`);
 
+  if (installResult.stdout.trim()) {
+    options.onProgress?.({
+      step: "install-trigger",
+      message: `System injector install call stdout: ${installResult.stdout.trim()}`,
+    });
+  }
+  if (installResult.stderr.trim()) {
+    options.onProgress?.({
+      step: "install-trigger",
+      message: `System injector install call stderr: ${installResult.stderr.trim()}`,
+    });
+  }
+
+  const providerOutput = `${installResult.stdout}\n${installResult.stderr}`;
+  const providerMessage = extractProviderMessage(providerOutput);
+  const emptyProviderBundle = hasEmptyProviderBundle(providerOutput);
+  options.onProgress?.({
+    step: "install-trigger",
+    message: providerMessage
+      ? `System injector provider message: ${providerMessage}`
+      : emptyProviderBundle
+        ? "System injector returned an empty bundle; treating install trigger as success."
+        : "System injector provider message could not be extracted from install call output.",
+  });
+  if (!providerMessage && !emptyProviderBundle) {
+    throw new Error("System injector provider message could not be extracted from install call output.");
+  }
+  if (providerMessage && providerMessage !== "OK") {
+    throw new Error(providerMessage);
+  }
+
   options.onProgress?.({
     step: "install-wait-package-manager",
     message: `Waiting for system services after installing ${name}.`,
@@ -436,4 +499,8 @@ export async function stageSystemApkInstall(
     });
     await waitForStagingProviderReady(transport);
   }
+
+  return {
+    message: providerMessage,
+  };
 }

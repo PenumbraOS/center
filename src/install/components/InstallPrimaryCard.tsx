@@ -5,6 +5,7 @@ import {
   type PrimaryCardActionViewModel,
 } from "../presentation/primaryCardViewModel";
 import { ConnectionHelpModal } from "./ConnectionHelpModal";
+import { OverflowMenu } from "./OverflowMenu";
 
 function runAction(options: {
   action: PrimaryCardActionViewModel;
@@ -34,6 +35,11 @@ function runAction(options: {
 
   if (action.key === "primaryAction") {
     onPrimaryAction();
+    return;
+  }
+
+  if (action.key === "installApkFile") {
+    void controller.runInstallApkFile();
     return;
   }
 
@@ -171,6 +177,7 @@ export function InstallPrimaryCard({
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const showConnectionHelp = viewModel.primaryAction?.key === "connect";
+  const { overflowAction } = viewModel;
 
   return (
     <section className="install-stage" aria-labelledby="install-stage-title">
@@ -306,32 +313,51 @@ export function InstallPrimaryCard({
         </div>
 
         <div className="install-stage__links-slot">
-          {viewModel.secondaryActions.length > 0 || showConnectionHelp ? (
-            <nav className="install-stage__links" aria-label="More Actions">
-              {viewModel.secondaryActions.map((action) => (
-                <span key={action.key} className="install-stage__link-item">
-                  <SecondaryLink
-                    action={action}
-                    controller={controller}
-                    onPrimaryAction={onPrimaryAction}
-                    onRollback={onRollback}
-                    onUninstall={onUninstall}
-                    onRemoveConflicts={onRemoveConflicts}
-                  />
-                </span>
-              ))}
-              {showConnectionHelp ? (
-                <span className="install-stage__link-item">
-                  <button
-                    type="button"
-                    className="install-stage__link"
-                    onClick={() => setHelpOpen(true)}
-                  >
-                    Connection Help
-                  </button>
-                </span>
+          {viewModel.secondaryActions.length > 0 ||
+          showConnectionHelp ||
+          overflowAction ? (
+            <div className="install-stage__links-wrap">
+              <nav className="install-stage__links" aria-label="More Actions">
+                {viewModel.secondaryActions.map((action) => (
+                  <span key={action.key} className="install-stage__link-item">
+                    <SecondaryLink
+                      action={action}
+                      controller={controller}
+                      onPrimaryAction={onPrimaryAction}
+                      onRollback={onRollback}
+                      onUninstall={onUninstall}
+                      onRemoveConflicts={onRemoveConflicts}
+                    />
+                  </span>
+                ))}
+                {showConnectionHelp ? (
+                  <span className="install-stage__link-item">
+                    <button
+                      type="button"
+                      className="install-stage__link"
+                      onClick={() => setHelpOpen(true)}
+                    >
+                      Connection Help
+                    </button>
+                  </span>
+                ) : null}
+              </nav>
+              {overflowAction ? (
+                <OverflowMenu
+                  action={overflowAction}
+                  onAction={() =>
+                    runAction({
+                      action: overflowAction,
+                      controller,
+                      onPrimaryAction,
+                      onRollback,
+                      onUninstall,
+                      onRemoveConflicts,
+                    })
+                  }
+                />
               ) : null}
-            </nav>
+            </div>
           ) : null}
         </div>
       </footer>

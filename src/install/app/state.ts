@@ -93,6 +93,7 @@ export interface InstallLinkCommand {
 export interface InstallControllerCommands {
   readonly connect: InstallActionCommand;
   readonly primaryAction: InstallActionCommand;
+  readonly installApkFile: InstallActionCommand;
   readonly rollback: InstallActionCommand;
   readonly uninstall: InstallActionCommand;
   readonly removeConflicts: InstallActionCommand;
@@ -371,6 +372,7 @@ export function deriveInstallControllerCommands(
     state.inspection?.installActionsBlockedReason ??
     "Install-type actions are blocked until the installer can resolve a release target.";
   const deviceCredentialLocked = state.inspection?.readiness.credentialState.state === "locked";
+  const installerAvailable = state.inspection?.packages.installer.installed ?? false;
 
   return {
     connect: {
@@ -409,6 +411,22 @@ export function deriveInstallControllerCommands(
             : deviceCredentialLocked
               ? `Device is locked. Unlock the device, then press "Start Over".`
               : null,
+    },
+    installApkFile: {
+      visible: hasConnection || hasInspection,
+      label: "Install APK File",
+      disabled: state.isBusy || !hasConnection || !hasInspection || deviceCredentialLocked || !installerAvailable,
+      reason: state.isBusy
+        ? "Wait for the current task to finish."
+        : !hasConnection
+          ? "Connect a device before installing an APK file."
+          : !hasInspection
+            ? "Connect a device and inspect its state first."
+            : deviceCredentialLocked
+              ? `Device is locked. Unlock the device, then press "Start Over".`
+              : !installerAvailable
+                ? "APK file install requires system injector to be installed."
+                : null,
     },
     rollback: {
       visible:

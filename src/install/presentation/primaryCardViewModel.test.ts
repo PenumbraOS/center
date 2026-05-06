@@ -133,6 +133,7 @@ function createCommands(): InstallControllerCommands {
   return {
     connect: { visible: false, label: "Connect Device", disabled: false, reason: null },
     primaryAction: { visible: true, label: "Reinstall", disabled: false, reason: null },
+    installApkFile: { visible: true, label: "Install APK File", disabled: false, reason: null },
     rollback: { visible: false, label: "Rollback Install", disabled: false, reason: null, prominent: false },
     uninstall: { visible: true, label: "Uninstall", disabled: false, reason: null },
     removeConflicts: {

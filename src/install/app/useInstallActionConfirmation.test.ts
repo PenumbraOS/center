@@ -140,15 +140,15 @@ describe("createDialogForAction", () => {
     expect(dialog?.requirements.find((req) => req.kind === "known-conflicts")?.description).toContain("conflict.one");
     expect(dialog?.choices).toEqual([
       {
-        action: "fix-conflicts-and-install",
-        label: "Fix Conflicts and Reinstall",
-        tone: "primary",
-        recommended: true,
-      },
-      {
         action: "primary",
         label: "Reinstall Anyway",
         tone: "secondary",
+      },
+      {
+        action: "fix-conflicts-and-install",
+        label: "Remove and Reinstall",
+        tone: "primary",
+        recommended: true,
       },
     ]);
   });
@@ -193,6 +193,6 @@ describe("createDialogForAction", () => {
     ]);
     expect(dialog?.requirements.some((req) => req.kind === "remove-conflicts")).toBe(true);
     expect(dialog?.requirements.find((req) => req.kind === "remove-conflicts")?.description).toContain("conflict.one");
-    expect(dialog?.requirements.find((req) => req.kind === "remove-conflicts")?.description).toContain("additional cleanup command");
+    expect(dialog?.requirements.find((req) => req.kind === "remove-conflicts")?.description).toContain("Known conflicting packages will be removed from the device.");
   });
 });

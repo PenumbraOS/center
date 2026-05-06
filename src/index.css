@@ -810,6 +810,16 @@ button {
   align-items: center;
   justify-content: center;
   min-height: 32px;
+  width: 100%;
+}
+
+.install-stage__links-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
 }
 
 .install-stage__primary {
@@ -863,6 +873,85 @@ button {
 .install-stage__link-item {
   display: inline-flex;
   align-items: center;
+}
+
+.install-stage__overflow {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.install-stage__overflow-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-heading);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.install-stage__overflow-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+.install-stage__overflow-trigger:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--color-border-light);
+}
+
+.install-stage__overflow-trigger:disabled {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.install-stage__overflow-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--color-eclipse);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+
+.install-stage__overflow-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-heading);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.install-stage__overflow-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.install-stage__overflow-item:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .install-stage__link {

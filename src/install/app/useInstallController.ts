@@ -18,6 +18,7 @@ import type { OperationProgressEvent } from "../ops/phases";
 import { runRollbackOperation } from "../ops/rollback";
 import { runRemoveConflictsOperation } from "../ops/removeConflicts";
 import { runUninstallOperation } from "../ops/uninstall";
+import { runInstallApkFileOperation } from "./runInstallApkFile";
 import {
   createInitialInstallControllerState,
   deriveInstallControllerCommands,
@@ -40,6 +41,7 @@ export interface InstallController {
   connectAndInspect(): Promise<void>;
   recheck(): Promise<void>;
   runPrimaryAction(): Promise<void>;
+  runInstallApkFile(): Promise<void>;
   runRollback(): Promise<void>;
   runUninstall(): Promise<void>;
   runRemoveConflicts(): Promise<void>;
@@ -315,6 +317,18 @@ export function useInstallController(
         error: toErrorMessage(error),
       });
     }
+  }, [ensureTransport, refreshInspection]);
+
+  const runInstallApkFile = useCallback(async () => {
+    await runInstallApkFileOperation({
+      transport: ensureTransport(),
+      currentState: stateRef.current,
+      dispatch,
+      refreshInspection,
+      toErrorMessage,
+      getActiveTarget,
+      getInspectionTargetResolutionError,
+    });
   }, [ensureTransport, refreshInspection]);
 
   const runRollback = useCallback(async () => {
@@ -745,6 +759,7 @@ export function useInstallController(
     connectAndInspect,
     recheck,
     runPrimaryAction,
+    runInstallApkFile,
     runRollback,
     runUninstall,
     runRemoveConflicts,
