@@ -8,6 +8,7 @@ import { PinProvider, usePin } from "./hooks";
 import ConnectPage from "./pages/ConnectPage";
 import GalleryPage from "./pages/GalleryPage";
 import MemoryDetailPage from "./pages/MemoryDetailPage";
+import EsimSettingsPage from "./pages/EsimSettingsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SetupPage from "./pages/SetupPage";
 
@@ -38,6 +39,7 @@ const router = createHashRouter([
       { path: "/gallery", element: <GalleryPage /> },
       { path: "/gallery/:uuid", element: <MemoryDetailPage /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/settings/esim", element: <EsimSettingsPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

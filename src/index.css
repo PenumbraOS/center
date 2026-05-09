@@ -177,6 +177,28 @@ button {
   }
 }
 
+.app-floating-status {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: var(--space-lg);
+  z-index: 190;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-text-secondary);
+  background: rgba(15, 15, 15, 0.9);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.app-floating-status .app-spinner {
+  width: 1rem;
+  height: 1rem;
+}
+
 .app-overlay-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -227,6 +249,10 @@ button {
 
 .app-page-content .container {
   min-width: 0;
+}
+
+.app-settings-width {
+  max-width: 44rem;
 }
 
 .app-grid,

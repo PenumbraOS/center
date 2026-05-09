@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePin } from "../hooks";
 import type { Settings, UpdateSettingsRequest } from "../api";
 import SecretInput from "../components/SecretInput";
@@ -16,6 +17,7 @@ const LLM_PROVIDERS = [
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const { client, disconnect } = usePin();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -259,7 +261,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="app-page-content">
-        <div className="container app-flow" style={{ maxWidth: "44rem" }}>
+        <div className="container app-flow app-settings-width">
           <div className="app-button-row app-button-row--flex-end">
             <div className="app-inline-actions">
               {saveStatus === "saving" && (
@@ -410,6 +412,23 @@ export default function SettingsPage() {
                     onChange={setWeatherKey}
                     hasExisting={settings.weather.has_api_key}
                   />
+                </div>
+
+                <div className="app-subpanel app-flow--sm">
+                  <div>
+                    <h3>eSIM</h3>
+                    <p className="home-card-desc">
+                      Manage cellular profiles and activate a new eSIM.
+                    </p>
+                  </div>
+                  <br />
+                  <button
+                    type="button"
+                    className="app-button app-button--ghost"
+                    onClick={() => navigate("/settings/esim")}
+                  >
+                    Manage eSIM
+                  </button>
                 </div>
               </section>
 

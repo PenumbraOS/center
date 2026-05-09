@@ -1,9 +1,17 @@
 import type {
+  CellularServiceStatusResponse,
+  CellularSetEnabledResponse,
   DeviceInfo,
+  EsimEidResult,
+  EsimProfilesResult,
+  EsimRequestAcceptedResponse,
+  EsimRequestRecord,
+  EsimSnapshot,
   HealthInfo,
   MemoryRecord,
   Settings,
   UpdateSettingsRequest,
+  WifiSetEnabledResponse,
 } from "./types";
 
 export class PinApiError extends Error {
@@ -102,6 +110,126 @@ export class PinClient {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(s),
+      },
+      signal,
+    );
+  }
+
+  getCellularServiceStatus(signal?: AbortSignal) {
+    return this.request<CellularServiceStatusResponse>(
+      "/api/cellular/service-status",
+      undefined,
+      signal,
+    );
+  }
+
+  setCellularEnabled(enabled: boolean, signal?: AbortSignal) {
+    return this.request<CellularSetEnabledResponse>(
+      "/api/cellular/set-enabled",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      },
+      signal,
+    );
+  }
+
+  setWifiEnabled(enabled: boolean, signal?: AbortSignal) {
+    return this.request<WifiSetEnabledResponse>(
+      "/api/wifi/set-enabled",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      },
+      signal,
+    );
+  }
+
+  getEsimState(signal?: AbortSignal) {
+    return this.request<EsimSnapshot>("/api/esim/state", undefined, signal);
+  }
+
+  getEsimRequest(requestId: string, signal?: AbortSignal) {
+    return this.request<EsimRequestRecord>(
+      `/api/esim/requests/${encodeURIComponent(requestId)}`,
+      undefined,
+      signal,
+    );
+  }
+
+  getEsimProfiles(signal?: AbortSignal) {
+    return this.request<EsimProfilesResult>(
+      "/api/esim/get-profiles",
+      { method: "PUT" },
+      signal,
+    );
+  }
+
+  getEsimEid(signal?: AbortSignal) {
+    return this.request<EsimEidResult>(
+      "/api/esim/get-eid",
+      { method: "PUT" },
+      signal,
+    );
+  }
+
+  enableEsimProfile(iccid: string, signal?: AbortSignal) {
+    return this.request<EsimRequestAcceptedResponse>(
+      "/api/esim/enable-profile",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iccid }),
+      },
+      signal,
+    );
+  }
+
+  disableEsimProfile(iccid: string, signal?: AbortSignal) {
+    return this.request<EsimRequestAcceptedResponse>(
+      "/api/esim/disable-profile",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iccid }),
+      },
+      signal,
+    );
+  }
+
+  setEsimNickname(iccid: string, nickname: string, signal?: AbortSignal) {
+    return this.request<EsimRequestAcceptedResponse>(
+      "/api/esim/set-nickname",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iccid, nickname }),
+      },
+      signal,
+    );
+  }
+
+  deleteEsimProfile(iccid: string, signal?: AbortSignal) {
+    return this.request<EsimRequestAcceptedResponse>(
+      "/api/esim/delete-profile",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iccid }),
+      },
+      signal,
+    );
+  }
+
+  downloadVerifyEnableEsim(activationCode: string, signal?: AbortSignal) {
+    return this.request<EsimRequestAcceptedResponse>(
+      "/api/esim/download-verify-enable",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activation_code: activationCode }),
       },
       signal,
     );
