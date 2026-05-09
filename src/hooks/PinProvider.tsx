@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { PinClient } from "../api";
-import type { DeviceInfo, MemoryRecord, StreamEvent } from "../api";
+import { FetchPinTransport, PinClient, UsbAdbHttpTransport } from "../api";
+import type {
+  DeviceInfo,
+  MemoryRecord,
+  PinTransport,
+  StreamEvent,
+} from "../api";
 import { logDebug, logError, logInfo } from "../logging";
 import { PinContext, type PinContextValue } from "./pinContext";
 import {
@@ -23,7 +28,9 @@ function isTimeoutError(error: unknown): boolean {
 }
 
 export function PinProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<ConnectionStatus>(loadInitialConnectionState);
+  const [status, setStatus] = useState<ConnectionStatus>(
+    loadInitialConnectionState,
+  );
   const [baseUrl, setBaseUrl] = useState<string | null>(loadSavedUrl);
   const [client, setClient] = useState<PinClient | null>(null);
   const [device, setDevice] = useState<DeviceInfo | null>(null);
@@ -32,68 +39,119 @@ export function PinProvider({ children }: { children: ReactNode }) {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const autoReconnectAttemptedRef = useRef(false);
 
-  // Attempt connection to a Pin server.
-  const connect = useCallback(async (url: string) => {
-    const normalized = url.replace(/\/+$/, "");
-    const newClient = new PinClient(normalized);
+  const connectWithClient = useCallback(
+    async (
+      newClient: PinClient,
+      details: { label: string; savedUrl: string | null },
+    ) => {
+      setConnectionError(null);
+      setStatus("connecting");
+      setBaseUrl(newClient.baseUrl);
+      setClient(null);
+      setDevice(null);
+      setMemories([]);
+      setMemoriesLoaded(false);
 
-    logInfo("pin-provider", "Starting server connection", {
-      url,
-      normalized,
-    });
+      try {
+        const signal = AbortSignal.timeout(CONNECT_TIMEOUT_MS);
+
+        await newClient.health(signal);
+        logDebug("pin-provider", "Pin health check succeeded", {
+          label: details.label,
+          mode: newClient.mode,
+        });
+
+        const [deviceInfo, memoryList] = await Promise.all([
+          newClient.getDevice(signal),
+          newClient.listMemories(signal),
+        ]);
+
+        setClient(newClient);
+        setBaseUrl(newClient.baseUrl);
+        setDevice(deviceInfo);
+        setMemories(memoryList);
+        setMemoriesLoaded(true);
+        setConnectionError(null);
+        setStatus("connected");
+        saveUrl(details.savedUrl);
+        logInfo("pin-provider", "Connected to Pin server", {
+          label: details.label,
+          mode: newClient.mode,
+          device: deviceInfo,
+          memoryCount: memoryList.length,
+        });
+      } catch (error) {
+        await newClient.disconnect().catch(() => undefined);
+        setClient(null);
+        setDevice(null);
+        setMemories([]);
+        setMemoriesLoaded(false);
+        setStatus("disconnected");
+        const message = isTimeoutError(error)
+          ? `Connection timed out after ${CONNECT_TIMEOUT_MS / 1000} seconds`
+          : error instanceof Error
+            ? error.message
+            : "Failed to connect to Pin server";
+        setConnectionError(message);
+        logError("pin-provider", "Failed to connect to Pin server", error, {
+          label: details.label,
+          mode: newClient.mode,
+          timedOut: isTimeoutError(error),
+        });
+        throw new Error(message);
+      }
+    },
+    [],
+  );
+
+  // Attempt connection to a Pin server.
+  const connect = useCallback(
+    async (url: string) => {
+      const normalized = url.replace(/\/+$/, "");
+      const newClient = new PinClient(new FetchPinTransport(normalized));
+
+      logInfo("pin-provider", "Starting server connection", {
+        url,
+        normalized,
+      });
+
+      await connectWithClient(newClient, {
+        label: normalized,
+        savedUrl: normalized,
+      });
+    },
+    [connectWithClient],
+  );
+
+  const connectUsb = useCallback(async () => {
+    logInfo("pin-provider", "Starting USB server connection");
     setConnectionError(null);
     setStatus("connecting");
-    setBaseUrl(normalized);
+    setBaseUrl("usb://device");
     setClient(null);
     setDevice(null);
     setMemories([]);
     setMemoriesLoaded(false);
 
+    let transport: PinTransport;
     try {
-      const signal = AbortSignal.timeout(CONNECT_TIMEOUT_MS);
-
-      await newClient.health(signal);
-      logDebug("pin-provider", "Pin health check succeeded", {
-        normalized,
-      });
-
-      const [deviceInfo, memoryList] = await Promise.all([
-        newClient.getDevice(signal),
-        newClient.listMemories(signal),
-      ]);
-
-      setClient(newClient);
-      setBaseUrl(normalized);
-      setDevice(deviceInfo);
-      setMemories(memoryList);
-      setMemoriesLoaded(true);
-      setConnectionError(null);
-      setStatus("connected");
-      saveUrl(normalized);
-      logInfo("pin-provider", "Connected to Pin server", {
-        normalized,
-        device: deviceInfo,
-        memoryCount: memoryList.length,
-      });
+      transport = await UsbAdbHttpTransport.connect();
     } catch (error) {
-      setClient(null);
-      setDevice(null);
-      setMemories([]);
-      setMemoriesLoaded(false);
       setStatus("disconnected");
-      const message = isTimeoutError(error)
-        ? `Connection timed out after ${CONNECT_TIMEOUT_MS / 1000} seconds`
-        : error instanceof Error
+      setBaseUrl(null);
+      const message =
+        error instanceof Error
           ? error.message
-          : "Failed to connect to Pin server";
+          : "Failed to connect to USB device";
       setConnectionError(message);
-      logError("pin-provider", "Failed to connect to Pin server", error, {
-        normalized,
-        timedOut: isTimeoutError(error),
-      });
       throw new Error(message);
     }
-  }, []);
+
+    await connectWithClient(new PinClient(transport), {
+      label: "USB device",
+      savedUrl: null,
+    });
+  }, [connectWithClient]);
 
   const clearConnectionError = useCallback(() => {
     setConnectionError(null);
@@ -102,6 +160,10 @@ export function PinProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     logInfo("pin-provider", "Disconnecting from Pin server", {
       baseUrl,
+      mode: client?.mode,
+    });
+    void client?.disconnect().catch((error) => {
+      logError("pin-provider", "Failed to close Pin client", error);
     });
     setClient(null);
     setBaseUrl(null);
@@ -111,7 +173,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
     setConnectionError(null);
     setStatus("disconnected");
     saveUrl(null);
-  }, [baseUrl]);
+  }, [baseUrl, client]);
 
   const deleteMemory = useCallback(
     async (uuid: string) => {
@@ -152,7 +214,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEventStream(baseUrl, handleEvent);
+  useEventStream(client, handleEvent);
 
   // Auto-reconnect on mount if we have a saved URL.
   useEffect(() => {
@@ -187,6 +249,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
       memoriesLoaded,
       connectionError,
       connect,
+      connectUsb,
       clearConnectionError,
       disconnect,
       deleteMemory,
@@ -200,6 +263,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
       memoriesLoaded,
       connectionError,
       connect,
+      connectUsb,
       clearConnectionError,
       disconnect,
       deleteMemory,
@@ -209,4 +273,3 @@ export function PinProvider({ children }: { children: ReactNode }) {
 
   return <PinContext.Provider value={value}>{children}</PinContext.Provider>;
 }
-

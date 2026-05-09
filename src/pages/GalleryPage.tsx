@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { usePin } from "../hooks";
+import { useAssetUrl, usePin } from "../hooks";
 import type { MemoryRecord } from "../api";
 
 type FilterType = "all" | "photo" | "video" | "note" | "food_log";
@@ -35,13 +35,15 @@ function statusBadge(status: string) {
   }
 }
 
-function MemoryCard({
-  memory,
-  thumbnailUrl,
-}: {
-  memory: MemoryRecord;
-  thumbnailUrl: string | null;
-}) {
+function MemoryCard({ memory }: { memory: MemoryRecord }) {
+  const { client } = usePin();
+  const thumbnailUrl = useAssetUrl(
+    client,
+    memory.thumbnail_count > 0
+      ? client?.thumbnailPath(memory.uuid, 0) ?? null
+      : null,
+  );
+
   return (
     <Link to={`/gallery/${memory.uuid}`} className="gallery-card app-gallery-link">
       {statusBadge(memory.status)}
@@ -75,7 +77,7 @@ function MemoryCard({
 }
 
 export default function GalleryPage() {
-  const { memories, memoriesLoaded, client } = usePin();
+  const { memories, memoriesLoaded } = usePin();
   const [filter, setFilter] = useState<FilterType>("all");
 
   const filtered = useMemo(() => {
@@ -138,15 +140,7 @@ export default function GalleryPage() {
           {memoriesLoaded && filtered.length > 0 && (
             <div className="gallery-grid gallery-grid--square">
               {filtered.map((memory) => (
-                <MemoryCard
-                  key={memory.uuid}
-                  memory={memory}
-                  thumbnailUrl={
-                    memory.thumbnail_count > 0 && client
-                      ? client.thumbnailUrl(memory.uuid, 0)
-                      : null
-                  }
-                />
+                <MemoryCard key={memory.uuid} memory={memory} />
               ))}
             </div>
           )}

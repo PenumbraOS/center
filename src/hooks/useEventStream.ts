@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { StreamEvent } from "../api";
+import type { PinClient, StreamEvent } from "../api";
 import { logDebug, logError, logInfo, logWarn } from "../logging";
 
 /**
@@ -7,7 +7,7 @@ import { logDebug, logError, logInfo, logWarn } from "../logging";
  * for each parsed event. Automatically reconnects on failure with a 3s delay.
  */
 export function useEventStream(
-  baseUrl: string | null,
+  client: PinClient | null,
   onEvent: (event: StreamEvent) => void,
 ) {
   // Keep a stable ref to the callback so we don't reconnect when it changes.
@@ -15,7 +15,10 @@ export function useEventStream(
   onEventRef.current = onEvent;
 
   useEffect(() => {
-    if (!baseUrl) return;
+    if (!client) return;
+
+    const activeClient = client;
+    const baseUrl = activeClient.baseUrl;
 
     let cancelled = false;
     let reconnectAttempt = 0;
@@ -30,30 +33,14 @@ export function useEventStream(
         });
 
         try {
-          const res = await fetch(`${baseUrl}/api/events`, {
-            signal: controller.signal,
-            // @ts-expect-error -- targetAddressSpace not in TS lib yet
-            targetAddressSpace: "local",
-          });
-
-          if (!res.ok) {
-            logWarn("event-stream", "Event stream returned non-OK status", {
-              baseUrl,
-              status: res.status,
-              statusText: res.statusText,
-            });
-            throw new Error(`Event stream returned ${res.status}`);
-          }
+          const stream = await activeClient.openStream("/api/events", controller.signal);
 
           logInfo("event-stream", "Event stream connected", {
             baseUrl,
             reconnectAttempt,
           });
 
-          const reader = res.body?.getReader();
-          if (!reader) {
-            throw new Error("Event stream response body is missing.");
-          }
+          const reader = stream.getReader();
 
           const decoder = new TextDecoder();
           let buffer = "";
@@ -110,5 +97,5 @@ export function useEventStream(
         baseUrl,
       });
     };
-  }, [baseUrl]);
+  }, [client]);
 }

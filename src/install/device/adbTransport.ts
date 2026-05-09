@@ -1,4 +1,4 @@
-import { Adb, AdbDaemonTransport } from "@yume-chan/adb";
+import { Adb, AdbDaemonTransport, type AdbSocket } from "@yume-chan/adb";
 import {
   AdbDaemonWebUsbDevice,
   AdbDaemonWebUsbDeviceManager,
@@ -68,6 +68,7 @@ export interface AdbSessionTransport {
     command: string | readonly string[],
     onLine: (line: CommandStreamLine) => void,
   ): Promise<CommandStreamController>;
+  createSocket?(service: string): Promise<AdbSocket>;
 }
 
 export const DEVICE_STEP_TIMEOUT_MS = 60000;
@@ -539,6 +540,18 @@ export class WebUsbAdbSessionTransport implements AdbSessionTransport {
     this.currentPtySession = session;
     this.markOperationSuccess();
     return session;
+  }
+
+  async createSocket(service: string): Promise<AdbSocket> {
+    const adb = this.requireAdb();
+    try {
+      const socket = await adb.createSocket(service);
+      this.markOperationSuccess();
+      return socket;
+    } catch (error) {
+      await this.recoverFromRetryableDisconnect(`createSocket ${service}`, error);
+      throw error;
+    }
   }
 
   async startCommandStream(

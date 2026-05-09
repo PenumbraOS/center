@@ -1,11 +1,54 @@
 import { useCallback, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { usePin } from "../hooks";
+import { useAssetUrl, usePin } from "../hooks";
 import { logError, logInfo } from "../logging";
+
+function PinAssetImage({ path, alt }: { path: string; alt: string }) {
+  const { client } = usePin();
+  const url = useAssetUrl(client, path);
+  return url ? <img src={url} alt={alt} /> : null;
+}
+
+function PinAssetVideo({ path }: { path: string }) {
+  const { client } = usePin();
+  const url = useAssetUrl(client, path);
+  return url ? (
+    <video src={url} controls>
+      <track kind="captions" />
+    </video>
+  ) : null;
+}
+
+function PinAssetLink({
+  path,
+  filename,
+  className,
+  children,
+}: {
+  path: string;
+  filename?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { client } = usePin();
+  const url = useAssetUrl(client, path);
+  return url ? (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      download={filename}
+      className={className}
+    >
+      {children}
+    </a>
+  ) : null;
+}
 
 export default function MemoryDetailPage() {
   const { uuid } = useParams<{ uuid: string }>();
-  const { memories, client, deleteMemory, baseUrl } = usePin();
+  const { memories, client, deleteMemory } = usePin();
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -87,24 +130,25 @@ export default function MemoryDetailPage() {
             {memory.thumbnail_count > 0 &&
               Array.from({ length: memory.thumbnail_count }, (_, i) => (
                 <div key={i} className="app-media-card">
-                  <img src={client.thumbnailUrl(memory.uuid, i)} alt={`Thumbnail ${i + 1}`} />
+                  <PinAssetImage
+                    path={client.thumbnailPath(memory.uuid, i)}
+                    alt={`Thumbnail ${i + 1}`}
+                  />
                 </div>
               ))}
 
             {mediaFiles.map((filename) => {
-              const url = client.fileUrl(memory.uuid, filename);
+              const path = client.filePath(memory.uuid, filename);
               if (filename.endsWith(".mp4") || filename.endsWith(".mov")) {
                 return (
                   <div key={filename} className="app-media-card">
-                    <video src={url} controls>
-                      <track kind="captions" />
-                    </video>
+                    <PinAssetVideo path={path} />
                   </div>
                 );
               }
               return (
                 <div key={filename} className="app-media-card">
-                  <img src={url} alt={filename} />
+                  <PinAssetImage path={path} alt={filename} />
                 </div>
               );
             })}
@@ -181,33 +225,31 @@ export default function MemoryDetailPage() {
                 <ul className="app-flow app-flow--sm" style={{ listStyle: "none", padding: 0 }}>
                   {otherFiles.map((f) => (
                     <li key={f}>
-                      <a
-                        href={client.fileUrl(memory.uuid, f)}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <PinAssetLink
+                        path={client.filePath(memory.uuid, f)}
                         className="app-code-link"
                       >
                         {f}
-                      </a>
+                      </PinAssetLink>
                     </li>
                   ))}
                 </ul>
               </section>
             )}
 
-            {baseUrl && memory.files.length > 0 && (
+            {memory.files.length > 0 && (
               <section className="app-info-card app-flow app-flow--sm">
                 <h2 className="app-panel-title">Download</h2>
                 <div className="app-download-list">
                   {memory.files.map((f) => (
-                    <a
+                    <PinAssetLink
                       key={f}
-                      href={client.fileUrl(memory.uuid, f)}
-                      download={f}
+                      path={`/api/memories/${memory.uuid}/files/${f}`}
+                      filename={f}
                       className="app-download-chip"
                     >
                       {f}
-                    </a>
+                    </PinAssetLink>
                   ))}
                 </div>
               </section>

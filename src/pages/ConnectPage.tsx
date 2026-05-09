@@ -7,7 +7,7 @@ import { usePin, loadSavedUrl } from "../hooks";
 import { logError, logInfo } from "../logging";
 
 export default function ConnectPage() {
-  const { connect, status, connectionError } = usePin();
+  const { connect, connectUsb, status, connectionError } = usePin();
   const navigate = useNavigate();
   const [address, setAddress] = useState(() => loadSavedUrl() ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +57,23 @@ export default function ConnectPage() {
         err instanceof Error && /timed out/i.test(err.message)
           ? err.message
           : "Could not connect. Check the address and make sure you have enabled LAN access in your browser.",
+      );
+      setPendingUrl(null);
+    }
+  }
+
+  async function attemptUsbConnect() {
+    setError(null);
+    setPendingUrl("usb://device");
+    logInfo("connect-page", "USB connect requested");
+    try {
+      await connectUsb();
+      logInfo("connect-page", "USB connect succeeded");
+      navigate("/gallery");
+    } catch (err) {
+      logError("connect-page", "USB connect failed", err);
+      setError(
+        err instanceof Error ? err.message : "Could not connect over USB.",
       );
       setPendingUrl(null);
     }
@@ -182,7 +199,9 @@ export default function ConnectPage() {
                 />
               </label>
 
-              {error && !connectionError && <p className="app-form-error">{error}</p>}
+              {error && !connectionError && (
+                <p className="app-form-error">{error}</p>
+              )}
 
               <div className="app-button-row">
                 <button
@@ -194,6 +213,27 @@ export default function ConnectPage() {
                 </button>
               </div>
             </form>
+
+            <div className="app-form-card app-flow">
+              <h2 className="app-section-title connect-page-panel-title">
+                USB Connection
+              </h2>
+              <p className="app-form-help">
+                Connect directly over USB to Ai Pin via an interposer.
+              </p>
+              <div className="app-button-row">
+                <button
+                  type="button"
+                  onClick={() => void attemptUsbConnect()}
+                  disabled={isConnecting}
+                  className="hero-cta app-button app-button--wide"
+                >
+                  {isConnecting && pendingUrl === "usb://device"
+                    ? "Connecting..."
+                    : "Connect over USB"}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="callout app-flow app-flow--sm">

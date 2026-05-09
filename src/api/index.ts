@@ -1,4 +1,7 @@
 export { PinClient, PinApiError } from "./client";
+export { BufferedPinResponse, FetchPinTransport } from "./transport";
+export { UsbAdbHttpTransport } from "./usbTransport";
+export type { PinResponseLike, PinTransport } from "./transport";
 export { discoverServers, DEFAULT_PIN_PORT } from "./discovery";
 export type { DiscoveredServer } from "./discovery";
 export type {

@@ -1,3 +1,4 @@
+import type { PinTransport } from "./transport";
 import type {
   CellularServiceStatusResponse,
   CellularSetEnabledResponse,
@@ -27,10 +28,19 @@ export class PinApiError extends Error {
 }
 
 export class PinClient {
-  readonly baseUrl: string;
+  readonly transport: PinTransport;
+  private readonly objectUrls = new Map<string, string>();
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+  constructor(transport: PinTransport) {
+    this.transport = transport;
+  }
+
+  get baseUrl(): string {
+    return this.transport.baseUrl ?? "usb://device";
+  }
+
+  get mode() {
+    return this.transport.mode;
   }
 
   private async request<T>(
@@ -38,12 +48,7 @@ export class PinClient {
     options?: RequestInit,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      signal,
-      // @ts-expect-error -- targetAddressSpace is not yet in TS lib types
-      targetAddressSpace: "local",
-    });
+    const res = await this.transport.request(path, options, signal);
     if (!res.ok) {
       throw new PinApiError(res.status, await res.text());
     }
@@ -63,14 +68,9 @@ export class PinClient {
     }
 
     const qs = params.toString();
-    const res = await fetch(
-      `${this.baseUrl}/api/logs/${kind}${qs ? `?${qs}` : ""}`,
-      {
-        headers: { Accept: "text/plain" },
-        // @ts-expect-error -- targetAddressSpace is not yet in TS lib types
-        targetAddressSpace: "local",
-      },
-    );
+    const res = await this.transport.request(`/api/logs/${kind}${qs ? `?${qs}` : ""}`, {
+      headers: { Accept: "text/plain" },
+    });
     const text = await res.text();
 
     if (res.status === 503) {
@@ -239,11 +239,63 @@ export class PinClient {
     return this.request<DeviceInfo>("/api/device", undefined, signal);
   }
 
-  thumbnailUrl(uuid: string, index: number) {
-    return `${this.baseUrl}/api/memories/${uuid}/thumbnail/${index}`;
+  thumbnailPath(uuid: string, index: number) {
+    return `/api/memories/${uuid}/thumbnail/${index}`;
   }
 
-  fileUrl(uuid: string, filename: string) {
-    return `${this.baseUrl}/api/memories/${uuid}/files/${filename}`;
+  filePath(uuid: string, filename: string) {
+    return `/api/memories/${uuid}/files/${filename}`;
+  }
+
+  async fetchAsset(path: string, signal?: AbortSignal) {
+    const res = await this.transport.request(path, undefined, signal);
+    if (!res.ok) {
+      throw new PinApiError(res.status, await res.text());
+    }
+    return res.blob();
+  }
+
+  async fetchAssetUrl(path: string, signal?: AbortSignal) {
+    const directUrl = this.transport.assetUrl(path);
+    if (directUrl) return directUrl;
+
+    const cached = this.objectUrls.get(path);
+    if (cached) return cached;
+
+    const blob = await this.fetchAsset(path, signal);
+    const objectUrl = URL.createObjectURL(blob);
+    this.objectUrls.set(path, objectUrl);
+    return objectUrl;
+  }
+
+  releaseAssetUrl(path: string) {
+    const objectUrl = this.objectUrls.get(path);
+    if (!objectUrl) return;
+    URL.revokeObjectURL(objectUrl);
+    this.objectUrls.delete(path);
+  }
+
+  clearAssetUrls() {
+    for (const objectUrl of this.objectUrls.values()) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    this.objectUrls.clear();
+  }
+
+  async openStream(path: string, signal?: AbortSignal) {
+    const res = await this.transport.request(path, undefined, signal);
+    if (!res.ok) {
+      throw new PinApiError(res.status, await res.text());
+    }
+    const body = res.body;
+    if (!body) {
+      throw new Error(`Response body is missing for ${path}`);
+    }
+    return body;
+  }
+
+  async disconnect() {
+    this.clearAssetUrls();
+    await (this.transport.disconnect?.() ?? Promise.resolve());
   }
 }

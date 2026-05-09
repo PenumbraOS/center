@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PinApiError, PinClient } from "./client";
+import { FetchPinTransport } from "./transport";
 
 function createTextResponse({
   ok,
@@ -60,7 +61,7 @@ describe("PinClient.fetchLogs", () => {
     });
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       const result = await client.fetchLogs("server");
 
       expect(result).toEqual({ available: true, text: "server log line\n" });
@@ -97,7 +98,7 @@ describe("PinClient.fetchLogs", () => {
     });
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.fetchLogs("server", { lines: 50, all: false });
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -133,7 +134,7 @@ describe("PinClient.fetchLogs", () => {
     });
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       const result = await client.fetchLogs("logcat");
 
       expect(result).toEqual({
@@ -166,7 +167,7 @@ describe("PinClient.fetchLogs", () => {
     });
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
 
       await expect(client.fetchLogs("server")).rejects.toEqual(
         new PinApiError(500, "read failure"),
@@ -218,7 +219,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await expect(client.getCellularServiceStatus()).resolves.toEqual(response);
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -244,7 +245,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.setCellularEnabled(true);
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -275,7 +276,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.setWifiEnabled(false);
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -303,7 +304,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await expect(client.getEsimState()).resolves.toEqual({
         connected: true,
         requests: [],
@@ -329,7 +330,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.getEsimProfiles();
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -360,7 +361,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.getEsimEid();
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -383,7 +384,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.enableEsimProfile("8901");
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -411,7 +412,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.deleteEsimProfile("8902");
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -439,7 +440,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await client.downloadVerifyEnableEsim("LPA:1$example$code");
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -467,7 +468,7 @@ describe("PinClient eSIM APIs", () => {
     const restoreFetch = installFetchMock(fetchMock);
 
     try {
-      const client = new PinClient("http://pin.test:8080");
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
       await expect(client.getEsimProfiles()).rejects.toEqual(
         new PinApiError(504, "timeout"),
       );

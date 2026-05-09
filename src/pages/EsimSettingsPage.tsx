@@ -228,24 +228,15 @@ export default function EsimSettingsPage() {
     let cancelled = false;
     let reconnectAttempt = 0;
     const controller = new AbortController();
-    const baseUrl = client.baseUrl;
+    const activeClient = client;
+    const baseUrl = activeClient.baseUrl;
 
     async function connect() {
       while (!cancelled) {
         reconnectAttempt += 1;
         try {
-          const res = await fetch(`${baseUrl}/api/esim/events`, {
-            signal: controller.signal,
-            // @ts-expect-error -- targetAddressSpace is not yet in TS lib types
-            targetAddressSpace: "local",
-          });
-
-          if (!res.ok) {
-            throw new Error(`eSIM event stream returned ${res.status}`);
-          }
-
-          const reader = res.body?.getReader();
-          if (!reader) throw new Error("eSIM event stream body is missing");
+          const stream = await activeClient.openStream("/api/esim/events", controller.signal);
+          const reader = stream.getReader();
 
           const decoder = new TextDecoder();
           let buffer = "";
