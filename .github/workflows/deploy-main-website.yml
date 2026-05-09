@@ -1,0 +1,21 @@
+name: Trigger PenumbraOS Website Deploy
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: PenumbraOS/website
+          event-type: center-updated
+          client-payload: >-
+            {
+              "source_repo": "${{ github.repository }}",
+              "source_ref": "${{ github.ref_name }}",
+              "source_sha": "${{ github.sha }}"
+            }
