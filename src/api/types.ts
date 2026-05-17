@@ -90,6 +90,9 @@ export interface Settings {
   weather: {
     has_api_key: boolean;
   };
+  contacts?: {
+    trust_all_contacts?: boolean;
+  };
 }
 
 /** Partial update request — only include fields you want to change. */
@@ -107,6 +110,9 @@ export interface UpdateSettingsRequest {
   };
   weather?: {
     pirate_weather_api_key?: string;
+  };
+  contacts?: {
+    trust_all_contacts?: boolean;
   };
 }
 

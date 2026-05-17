@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [weatherKey, setWeatherKey] = useState("");
+  const [trustAllContacts, setTrustAllContacts] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
     setWeatherKey("");
+    setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
   }, []);
 
   function handleProviderChange(next: string) {
@@ -144,6 +146,11 @@ export default function SettingsPage() {
 
     if (weatherKey !== "") {
       req.weather = { pirate_weather_api_key: weatherKey };
+      hasChanges = true;
+    }
+
+    if (trustAllContacts !== (settings.contacts?.trust_all_contacts ?? false)) {
+      req.contacts = { trust_all_contacts: trustAllContacts };
       hasChanges = true;
     }
 
@@ -412,6 +419,21 @@ export default function SettingsPage() {
                     onChange={setWeatherKey}
                     hasExisting={settings.weather.has_api_key}
                   />
+                </div>
+
+                <div className="app-form-field">
+                  <span className="app-form-label">Trust All Contacts</span>
+                  <label className="app-form-toggle-row">
+                    <span className="app-form-toggle-copy">
+                      Allow calls and messages from any contact.
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="app-checkbox"
+                      checked={trustAllContacts}
+                      onChange={(e) => setTrustAllContacts(e.target.checked)}
+                    />
+                  </label>
                 </div>
 
                 <div className="app-subpanel app-flow--sm">
