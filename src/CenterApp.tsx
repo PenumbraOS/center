@@ -6,6 +6,7 @@ import {
 import Layout from "./components/Layout";
 import { PinProvider, usePin } from "./hooks";
 import ConnectPage from "./pages/ConnectPage";
+import ContactsPage from "./pages/contacts/ContactsPage";
 import GalleryPage from "./pages/GalleryPage";
 import MemoryDetailPage from "./pages/MemoryDetailPage";
 import EsimSettingsPage from "./pages/EsimSettingsPage";
@@ -38,6 +39,9 @@ const router = createHashRouter([
       { path: "/connect", element: <ConnectPage /> },
       { path: "/gallery", element: <GalleryPage /> },
       { path: "/gallery/:uuid", element: <MemoryDetailPage /> },
+      { path: "/contacts", element: <ContactsPage /> },
+      { path: "/contacts/new", element: <ContactsPage mode="new" /> },
+      { path: "/contacts/:id/edit", element: <ContactsPage mode="edit" /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/settings/esim", element: <EsimSettingsPage /> },
       { path: "*", element: <Navigate to="/" replace /> },

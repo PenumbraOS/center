@@ -25,6 +25,43 @@ export interface HealthInfo {
   version?: string;
 }
 
+export interface ContactName {
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+  display_name?: string;
+}
+
+export interface ContactEmail {
+  value: string;
+  type?: string;
+}
+
+export interface ContactPhoneNumber {
+  value: string;
+  type?: string;
+}
+
+export interface ContactRecord {
+  id?: string;
+  name?: ContactName;
+  emails?: ContactEmail[];
+  phone_numbers?: ContactPhoneNumber[];
+  trusted?: boolean;
+  emergency?: boolean;
+  internal_favorite?: boolean;
+  temporary?: boolean;
+  contact_source?: string;
+  organization?: string;
+  modified_at?: number;
+}
+
+export interface ContactClientResetResponse {
+  queued: boolean;
+  receivers: number;
+  message?: string;
+}
+
 export interface DeviceInfo {
   display_name: string;
   server_port: number;

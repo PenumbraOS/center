@@ -2,6 +2,8 @@ import type { PinTransport } from "./transport";
 import type {
   CellularServiceStatusResponse,
   CellularSetEnabledResponse,
+  ContactClientResetResponse,
+  ContactRecord,
   DeviceInfo,
   EsimEidResult,
   EsimProfilesResult,
@@ -49,10 +51,14 @@ export class PinClient {
     signal?: AbortSignal,
   ): Promise<T> {
     const res = await this.transport.request(path, options, signal);
+    const text = await res.text();
     if (!res.ok) {
-      throw new PinApiError(res.status, await res.text());
+      throw new PinApiError(res.status, text);
     }
-    return res.json() as Promise<T>;
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   }
 
   async fetchLogs(
@@ -97,6 +103,54 @@ export class PinClient {
 
   deleteMemory(uuid: string, signal?: AbortSignal) {
     return this.request<void>(`/api/memories/${uuid}`, { method: "DELETE" }, signal);
+  }
+
+  listContacts(signal?: AbortSignal) {
+    return this.request<ContactRecord[]>("/api/contacts", undefined, signal);
+  }
+
+  getContact(id: string, signal?: AbortSignal) {
+    return this.request<ContactRecord>(`/api/contacts/${encodeURIComponent(id)}`, undefined, signal);
+  }
+
+  createContact(contact: ContactRecord, signal?: AbortSignal) {
+    return this.request<ContactRecord>(
+      "/api/contacts",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+      },
+      signal,
+    );
+  }
+
+  updateContact(id: string, contact: ContactRecord, signal?: AbortSignal) {
+    return this.request<ContactRecord>(
+      `/api/contacts/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+      },
+      signal,
+    );
+  }
+
+  deleteContact(id: string, signal?: AbortSignal) {
+    return this.request<void>(
+      `/api/contacts/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+      signal,
+    );
+  }
+
+  clientResetContacts(signal?: AbortSignal) {
+    return this.request<ContactClientResetResponse>(
+      "/api/contacts/client-reset",
+      { method: "POST" },
+      signal,
+    );
   }
 
   getSettings(signal?: AbortSignal) {

@@ -182,6 +182,109 @@ describe("PinClient.fetchLogs", () => {
   });
 });
 
+describe("PinClient contacts APIs", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("loads contacts", async () => {
+    const contacts = [{ id: "1", name: { display_name: "Ada" } }];
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 200, body: JSON.stringify(contacts) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await expect(client.listContacts()).resolves.toEqual(contacts);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/contacts", {
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  it("creates contacts", async () => {
+    const contact = { name: { display_name: "Ada" } };
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 201, body: JSON.stringify({ id: "1", ...contact }) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await client.createContact(contact);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  it("updates contacts", async () => {
+    const contact = { id: "a/b", name: { display_name: "Ada" } };
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 200, body: JSON.stringify(contact) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await client.updateContact("a/b", contact);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/contacts/a%2Fb", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  it("deletes contacts", async () => {
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 204, body: "" }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await client.deleteContact("a/b");
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/contacts/a%2Fb", {
+        method: "DELETE",
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  it("requests a contacts client reset", async () => {
+    const response = { queued: true, receivers: 1 };
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 200, body: JSON.stringify(response) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await expect(client.clientResetContacts()).resolves.toEqual(response);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/contacts/client-reset", {
+        method: "POST",
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+});
+
 describe("PinClient eSIM APIs", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

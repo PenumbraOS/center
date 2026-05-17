@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { AppDialog } from "../../components/AppDialog";
 import type {
   InstallConfirmationChoiceAction,
   InstallConfirmationDialog,
@@ -31,93 +32,70 @@ export function ConfirmActionModal({
 }) {
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!dialog) {
-      return undefined;
-    }
-
-    confirmButtonRef.current?.focus();
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCancel();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [dialog, onCancel]);
-
-  if (!dialog) {
-    return null;
-  }
-
   return (
-    <div className="app-overlay">
-      <div
-        className="app-overlay-card install-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="install-confirm-title"
-        aria-describedby="install-confirm-copy"
-      >
-        <div>
-          <h2 id="install-confirm-title" className="install-dialog__title">
-            {dialog.title}
-          </h2>
-          <p id="install-confirm-copy" className="install-dialog__copy">
-            {dialog.body}
-          </p>
-        </div>
+    <AppDialog
+      open={!!dialog}
+      className="install-dialog"
+      labelledBy="install-confirm-title"
+      describedBy="install-confirm-copy"
+      initialFocusRef={confirmButtonRef}
+      onDismiss={onCancel}
+      closeOnEscape
+      lockBodyScroll
+    >
+      {dialog && (
+        <>
+          <div>
+            <h2 id="install-confirm-title" className="install-dialog__title">
+              {dialog.title}
+            </h2>
+            <p id="install-confirm-copy" className="install-dialog__copy">
+              {dialog.body}
+            </p>
+          </div>
 
-        {dialog.requirements.length > 0 ? (
-          <ul className="install-dialog__requirements">
-            {dialog.requirements.map((requirement) => (
-              <li
-                key={requirement.kind}
-                className={`install-dialog__requirement ${getRequirementToneClass(requirement)}`.trim()}
-              >
-                <h3 className="install-dialog__requirement-title">
-                  {requirement.title}
-                </h3>
-                <p className="install-dialog__requirement-copy">
-                  {requirement.description}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+          {dialog.requirements.length > 0 ? (
+            <ul className="install-dialog__requirements">
+              {dialog.requirements.map((requirement) => (
+                <li
+                  key={requirement.kind}
+                  className={`install-dialog__requirement ${getRequirementToneClass(requirement)}`.trim()}
+                >
+                  <h3 className="install-dialog__requirement-title">
+                    {requirement.title}
+                  </h3>
+                  <p className="install-dialog__requirement-copy">
+                    {requirement.description}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
-        <div className="install-dialog__actions">
-          <button
-            type="button"
-            className="install-dialog__button install-dialog__button--ghost"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          {dialog?.choices?.map((choice) => (
+          <div className="install-dialog__actions">
             <button
-              key={`${choice.action}-${choice.label}`}
-              ref={!!choice.recommended ? confirmButtonRef : undefined}
               type="button"
-              className={`install-dialog__button install-dialog__button--${choice.tone}`}
-              onClick={() => {
-                void onConfirm(choice.action);
-              }}
+              className="install-dialog__button install-dialog__button--ghost"
+              onClick={onCancel}
             >
-              {choice.label}
+              Cancel
             </button>
-          ))}
-        </div>
-      </div>
-    </div>
+            {dialog.choices?.map((choice) => (
+              <button
+                key={`${choice.action}-${choice.label}`}
+                ref={choice.recommended ? confirmButtonRef : undefined}
+                type="button"
+                className={`install-dialog__button install-dialog__button--${choice.tone}`}
+                onClick={() => {
+                  void onConfirm(choice.action);
+                }}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </AppDialog>
   );
 }

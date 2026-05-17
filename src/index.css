@@ -1868,6 +1868,23 @@ button.app-button--ghost {
   padding: 0.35rem;
 }
 
+.contacts-card-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.contacts-favorite-button {
+  flex: 0 0 auto;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.contacts-favorite-button[aria-pressed="true"] {
+  color: var(--color-beam);
+}
+
 .app-inline-text-button {
   font-size: 0.85rem;
   font-weight: 500;
