@@ -128,7 +128,11 @@ describe("selectRequiredReleaseAssets", () => {
     };
 
     expect(() =>
-      selectRequiredReleaseAssets(normalizedRelease, SYSTEM_INJECTOR_REPO, SYSTEM_INJECTOR_ASSET_PATTERNS),
+      selectRequiredReleaseAssets(
+        normalizedRelease,
+        SYSTEM_INJECTOR_REPO,
+        SYSTEM_INJECTOR_ASSET_PATTERNS,
+      ),
     ).toThrow(ReleaseResolutionError);
   });
 
@@ -153,7 +157,8 @@ describe("selectRequiredReleaseAssets", () => {
         })),
         {
           id: 13,
-          apiUrl: "https://api.github.com/repos/PenumbraOS/system-injector/releases/assets/13",
+          apiUrl:
+            "https://api.github.com/repos/PenumbraOS/system-injector/releases/assets/13",
           name: "PenumbraOS-SystemInjector-Installer-2026-04-29.0-copy.apk",
           browserDownloadUrl: "https://example.test/installer-copy.apk",
           size: 125,
@@ -168,7 +173,11 @@ describe("selectRequiredReleaseAssets", () => {
     };
 
     expect(() =>
-      selectRequiredReleaseAssets(normalizedRelease, SYSTEM_INJECTOR_REPO, duplicatePattern),
+      selectRequiredReleaseAssets(
+        normalizedRelease,
+        SYSTEM_INJECTOR_REPO,
+        duplicatePattern,
+      ),
     ).toThrow(ReleaseResolutionError);
   });
 });
@@ -200,12 +209,18 @@ describe("resolveInstallTarget", () => {
     const target = await resolveInstallTarget(fetchImpl);
 
     expect(target.systemInjector.release.tagName).toBe("2026-04-29.0");
-    expect(target.systemInjector.assets.installerApk.name).toContain("SystemInjector-Installer");
-    expect(target.humaneSystemHook.assets.serverApk.name).toBe("PenumbraOS-Server-2026-04-29.0.apk");
+    expect(target.systemInjector.assets.installerApk.name).toContain(
+      "SystemInjector-Installer",
+    );
+    expect(target.humaneSystemHook.assets.serverApk.name).toBe(
+      "PenumbraOS-Server-2026-04-29.0.apk",
+    );
   });
 });
 
-function normalizeRelease(repo: "system-injector" | "humane-system-hook"): GithubRelease {
+function normalizeRelease(
+  repo: "system-injector" | "humane-system-hook",
+): GithubRelease {
   const [release] = createReleasePayload(repo);
   return {
     id: release.id,
@@ -249,7 +264,11 @@ describe("downloadInstallTargetAssets", () => {
     };
 
     const seenCalls: Array<{ input: string; init?: RequestInit }> = [];
-    const contextSensitiveFetch = vi.fn(function (this: typeof globalThis, input: string, init?: RequestInit) {
+    const contextSensitiveFetch = vi.fn(function (
+      this: typeof globalThis,
+      input: string,
+      init?: RequestInit,
+    ) {
       if (this !== globalThis) {
         throw new TypeError("Illegal invocation");
       }
@@ -286,7 +305,8 @@ describe("downloadInstallTargetAssets", () => {
       expect(result.serverApk).toBeInstanceOf(Blob);
       expect(contextSensitiveFetch).toHaveBeenCalledTimes(5);
       expect(seenCalls[0]).toMatchObject({
-        input: "https://proxy.penumbraos.workers.dev/repos/PenumbraOS/system-injector/releases/assets/11",
+        input:
+          "https://proxy.penumbraos.workers.dev/repos/PenumbraOS/system-injector/releases/assets/11",
         init: {
           headers: {
             Accept: "application/octet-stream",
@@ -300,6 +320,62 @@ describe("downloadInstallTargetAssets", () => {
         value: originalFetch,
       });
     }
+  });
+
+  it("downloads only selected install target assets", async () => {
+    const target = {
+      inspectedAt: "2026-04-29T12:00:00.000Z",
+      systemInjector: {
+        release: normalizeRelease("system-injector"),
+        assets: {
+          installerApk: normalizeRelease("system-injector").assets[0],
+          exploitApk: normalizeRelease("system-injector").assets[1],
+        },
+      },
+      humaneSystemHook: {
+        release: normalizeRelease("humane-system-hook"),
+        assets: {
+          hookApk: normalizeRelease("humane-system-hook").assets[0],
+          serverApk: normalizeRelease("humane-system-hook").assets[1],
+          injectorApk: normalizeRelease("humane-system-hook").assets[2],
+        },
+      },
+    };
+    const progressEvents: { assetCount: number; assetIndex: number }[] = [];
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      body: null,
+      headers: {
+        get() {
+          return "3";
+        },
+      },
+      async blob() {
+        return new Blob(["apk"]);
+      },
+      async text() {
+        return "";
+      },
+    }));
+
+    const result = await downloadInstallTargetAssets(target, {
+      fetchImpl,
+      assetRoles: ["hookApk"],
+      onAssetProgress(event) {
+        progressEvents.push({
+          assetCount: event.assetCount,
+          assetIndex: event.assetIndex,
+        });
+      },
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.hookApk).toBeInstanceOf(Blob);
+    expect(result.serverApk).toBeUndefined();
+    expect(result.installerApk).toBeUndefined();
+    expect(progressEvents).toContainEqual({ assetCount: 1, assetIndex: 0 });
   });
 
   it("reports asset download progress while streaming", async () => {
@@ -322,7 +398,11 @@ describe("downloadInstallTargetAssets", () => {
       },
     };
 
-    const progressEvents: { bytesLoaded: number; bytesTotal: number | null; assetIndex: number }[] = [];
+    const progressEvents: {
+      bytesLoaded: number;
+      bytesTotal: number | null;
+      assetIndex: number;
+    }[] = [];
     const fetchImpl = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -359,8 +439,16 @@ describe("downloadInstallTargetAssets", () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(5);
-    expect(progressEvents.some((event) => event.bytesLoaded === 0 && event.bytesTotal === 4)).toBe(true);
-    expect(progressEvents.some((event) => event.bytesLoaded === 4 && event.bytesTotal === 4)).toBe(true);
+    expect(
+      progressEvents.some(
+        (event) => event.bytesLoaded === 0 && event.bytesTotal === 4,
+      ),
+    ).toBe(true);
+    expect(
+      progressEvents.some(
+        (event) => event.bytesLoaded === 4 && event.bytesTotal === 4,
+      ),
+    ).toBe(true);
     expect(progressEvents.some((event) => event.assetIndex === 0)).toBe(true);
   });
 });

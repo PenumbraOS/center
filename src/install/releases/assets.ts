@@ -37,9 +37,13 @@ export const HUMANE_SYSTEM_HOOK_ASSET_PATTERNS = {
   injectorApk: /^PenumbraOS-HumaneHookInjector-.+\.apk$/,
 } as const;
 
-export type SystemInjectorAssetRole = keyof typeof SYSTEM_INJECTOR_ASSET_PATTERNS;
-export type HumaneSystemHookAssetRole = keyof typeof HUMANE_SYSTEM_HOOK_ASSET_PATTERNS;
-export type ReleaseAssetRole = SystemInjectorAssetRole | HumaneSystemHookAssetRole;
+export type SystemInjectorAssetRole =
+  keyof typeof SYSTEM_INJECTOR_ASSET_PATTERNS;
+export type HumaneSystemHookAssetRole =
+  keyof typeof HUMANE_SYSTEM_HOOK_ASSET_PATTERNS;
+export type ReleaseAssetRole =
+  | SystemInjectorAssetRole
+  | HumaneSystemHookAssetRole;
 
 export interface SelectedReleaseAssets<TAssetRole extends string> {
   readonly release: GithubRelease;
@@ -52,13 +56,15 @@ export interface ResolvedInstallTarget {
   readonly humaneSystemHook: SelectedReleaseAssets<HumaneSystemHookAssetRole>;
 }
 
+export type DownloadedInstallAssetRole = ReleaseAssetRole;
+
 export interface DownloadedInstallTargetAssets {
   readonly target: ResolvedInstallTarget;
-  readonly installerApk: Blob;
-  readonly exploitApk: Blob;
-  readonly hookApk: Blob;
-  readonly serverApk: Blob;
-  readonly injectorApk: Blob;
+  readonly installerApk?: Blob;
+  readonly exploitApk?: Blob;
+  readonly hookApk?: Blob;
+  readonly serverApk?: Blob;
+  readonly injectorApk?: Blob;
 }
 
 export interface AssetDownloadProgressEvent {
@@ -71,6 +77,7 @@ export interface AssetDownloadProgressEvent {
 
 export interface DownloadInstallTargetAssetsOptions {
   readonly fetchImpl?: AssetFetchLike;
+  readonly assetRoles?: readonly DownloadedInstallAssetRole[];
   readonly onAssetProgress?: (event: AssetDownloadProgressEvent) => void;
 }
 
@@ -142,10 +149,20 @@ export async function resolveRepoReleaseAssets<TAssetRole extends string>(
   };
 }
 
-export async function resolveInstallTarget(fetchImpl?: FetchLike): Promise<ResolvedInstallTarget> {
+export async function resolveInstallTarget(
+  fetchImpl?: FetchLike,
+): Promise<ResolvedInstallTarget> {
   const [systemInjector, humaneSystemHook] = await Promise.all([
-    resolveRepoReleaseAssets(SYSTEM_INJECTOR_REPO, SYSTEM_INJECTOR_ASSET_PATTERNS, fetchImpl),
-    resolveRepoReleaseAssets(HUMANE_SYSTEM_HOOK_REPO, HUMANE_SYSTEM_HOOK_ASSET_PATTERNS, fetchImpl),
+    resolveRepoReleaseAssets(
+      SYSTEM_INJECTOR_REPO,
+      SYSTEM_INJECTOR_ASSET_PATTERNS,
+      fetchImpl,
+    ),
+    resolveRepoReleaseAssets(
+      HUMANE_SYSTEM_HOOK_REPO,
+      HUMANE_SYSTEM_HOOK_ASSET_PATTERNS,
+      fetchImpl,
+    ),
   ]);
 
   return {
@@ -240,7 +257,8 @@ async function downloadAsset(
 }
 
 function getDefaultAssetFetch(): AssetFetchLike {
-  return (input, init) => globalThis.fetch(input, init) as Promise<AssetFetchResponseLike>;
+  return (input, init) =>
+    globalThis.fetch(input, init) as Promise<AssetFetchResponseLike>;
 }
 
 export async function downloadInstallTargetAssets(
@@ -248,36 +266,37 @@ export async function downloadInstallTargetAssets(
   options: DownloadInstallTargetAssetsOptions = {},
 ): Promise<DownloadedInstallTargetAssets> {
   const fetchImpl = options.fetchImpl ?? getDefaultAssetFetch();
-  const assets = [
-    target.systemInjector.assets.installerApk,
-    target.systemInjector.assets.exploitApk,
-    target.humaneSystemHook.assets.hookApk,
-    target.humaneSystemHook.assets.serverApk,
-    target.humaneSystemHook.assets.injectorApk,
+  const allAssetEntries = [
+    { role: "installerApk", asset: target.systemInjector.assets.installerApk },
+    { role: "exploitApk", asset: target.systemInjector.assets.exploitApk },
+    { role: "hookApk", asset: target.humaneSystemHook.assets.hookApk },
+    { role: "serverApk", asset: target.humaneSystemHook.assets.serverApk },
+    { role: "injectorApk", asset: target.humaneSystemHook.assets.injectorApk },
   ] as const;
+  const selectedRoles = options.assetRoles ? new Set(options.assetRoles) : null;
+  const assetEntries = selectedRoles
+    ? allAssetEntries.filter((entry) => selectedRoles.has(entry.role))
+    : allAssetEntries;
 
   const blobs = await Promise.all(
-    assets.map((asset, index) =>
-      downloadAsset(asset, fetchImpl, (bytesLoaded, bytesTotal) => {
+    assetEntries.map((entry, index) =>
+      downloadAsset(entry.asset, fetchImpl, (bytesLoaded, bytesTotal) => {
         options.onAssetProgress?.({
-          assetName: asset.name,
+          assetName: entry.asset.name,
           assetIndex: index,
-          assetCount: assets.length,
+          assetCount: assetEntries.length,
           bytesLoaded,
           bytesTotal,
         });
-      }),
+      }).then((blob) => [entry.role, blob] as const),
     ),
   );
 
-  const [installerApk, exploitApk, hookApk, serverApk, injectorApk] = blobs;
-
-  return {
-    target,
-    installerApk,
-    exploitApk,
-    hookApk,
-    serverApk,
-    injectorApk,
-  };
+  return blobs.reduce<DownloadedInstallTargetAssets>(
+    (downloadedAssets, [role, blob]) => ({
+      ...downloadedAssets,
+      [role]: blob,
+    }),
+    { target },
+  );
 }

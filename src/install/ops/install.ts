@@ -5,13 +5,17 @@ import {
 import type { SystemInstallerProgressEvent } from "../device/systemInstaller";
 import {
   downloadInstallTargetAssets,
+  type DownloadedInstallAssetRole,
   type DownloadedInstallTargetAssets,
   type DownloadInstallTargetAssetsOptions,
   type ResolvedInstallTarget,
 } from "../releases/assets";
 import type { InstallInspectionResult } from "../domain/inspection";
 import { PREINSTALL_CLEANUP_COMMANDS } from "../domain/knownPackageConflicts";
-import type { KnownPackageConflictCleanupCommand } from "../domain/types";
+import type {
+  KnownPackageConflictCleanupCommand,
+  ManagedPackageRole,
+} from "../domain/types";
 import {
   INSTALL_OPERATION_PHASES,
   createOperationProgressEvent,
@@ -22,6 +26,7 @@ import {
 import {
   bootstrapFinalInstaller,
   cleanupManagedPackages,
+  cleanupSelectedManagedPackages,
   disableConfiguredPackages,
   installManagedPackages,
   verifyInstalledManagedState,
@@ -42,6 +47,7 @@ export interface InstallOperationResult {
 export interface InstallOperationOptions {
   readonly transport: AdbSessionTransport;
   readonly target: ResolvedInstallTarget;
+  readonly inspection?: InstallInspectionResult | null;
   readonly fetchImpl?: DownloadInstallTargetAssetsOptions["fetchImpl"];
   readonly onProgress?: (event: OperationProgressEvent) => void;
 }
@@ -56,6 +62,10 @@ export interface InstallOperationInternals {
     command: KnownPackageConflictCleanupCommand,
   ): Promise<{ success: boolean; message: string }>;
   cleanupManagedPackages(transport: AdbSessionTransport): Promise<void>;
+  cleanupSelectedManagedPackages(
+    transport: AdbSessionTransport,
+    roles: readonly ManagedPackageRole[],
+  ): Promise<void>;
   bootstrapFinalInstaller(
     transport: AdbSessionTransport,
     assets: {
@@ -70,6 +80,7 @@ export interface InstallOperationInternals {
     transport: AdbSessionTransport,
     downloadedAssets: DownloadedInstallTargetAssets,
     options?: {
+      readonly roles?: readonly ManagedPackageRole[];
       readonly onProgress?: (event: SystemInstallerProgressEvent) => void;
       readonly onPackageStart?: (info: {
         readonly packageName: string;
@@ -83,7 +94,9 @@ export interface InstallOperationInternals {
       }) => void;
     },
   ): Promise<void>;
-  disableConfiguredPackages(transport: AdbSessionTransport): Promise<OperationWarning[]>;
+  disableConfiguredPackages(
+    transport: AdbSessionTransport,
+  ): Promise<OperationWarning[]>;
   setHomeActivity(transport: AdbSessionTransport): Promise<void>;
   verifyInstalledManagedState(
     transport: AdbSessionTransport,
@@ -105,6 +118,7 @@ const defaultInstallInternals: InstallOperationInternals = {
     };
   },
   cleanupManagedPackages,
+  cleanupSelectedManagedPackages,
   bootstrapFinalInstaller,
   installManagedPackages,
   disableConfiguredPackages,
@@ -169,17 +183,113 @@ function getShortAssetLabel(assetName: string): string {
   return stripped.replace(/\.apk$/, "");
 }
 
+const INSTALLABLE_PACKAGE_ROLES: readonly ManagedPackageRole[] = [
+  "hook",
+  "server",
+  "injector",
+];
+
+function targetMatchesInspection(
+  target: ResolvedInstallTarget,
+  inspection: InstallInspectionResult,
+): boolean {
+  return (
+    inspection.target?.systemInjector.release.tagName ===
+      target.systemInjector.release.tagName &&
+    inspection.target?.humaneSystemHook.release.tagName ===
+      target.humaneSystemHook.release.tagName
+  );
+}
+
+function getRolesToUpdate(
+  inspection: InstallInspectionResult,
+): readonly ManagedPackageRole[] {
+  return Object.values(inspection.packages)
+    .filter((pkg) => pkg.versionComparison !== "equal")
+    .map((pkg) => pkg.role);
+}
+
+function getAssetsForRoles(
+  roles: readonly ManagedPackageRole[],
+): readonly DownloadedInstallAssetRole[] {
+  const assets = new Set<DownloadedInstallAssetRole>();
+
+  for (const role of roles) {
+    switch (role) {
+      case "installer":
+        assets.add("installerApk");
+        assets.add("exploitApk");
+        break;
+      case "hook":
+        assets.add("hookApk");
+        break;
+      case "server":
+        assets.add("serverApk");
+        break;
+      case "injector":
+        assets.add("injectorApk");
+        break;
+    }
+  }
+
+  return [...assets];
+}
+
+function requireDownloadedAsset(
+  downloadedAssets: DownloadedInstallTargetAssets,
+  assetKey: DownloadedInstallAssetRole,
+): Blob {
+  const asset = downloadedAssets[assetKey];
+  if (!asset) {
+    throw new Error(`Missing downloaded asset ${assetKey}.`);
+  }
+  return asset;
+}
+
+function createInstallPlan(options: InstallOperationOptions) {
+  const canTargetUpdate =
+    options.inspection?.actionState.action === "Update" &&
+    targetMatchesInspection(options.target, options.inspection);
+  const rolesToUpdate = canTargetUpdate
+    ? getRolesToUpdate(options.inspection)
+    : [];
+  const targetedUpdate = canTargetUpdate && rolesToUpdate.length > 0;
+  const packageRoles = targetedUpdate
+    ? INSTALLABLE_PACKAGE_ROLES.filter((role) => rolesToUpdate.includes(role))
+    : INSTALLABLE_PACKAGE_ROLES;
+  const assetRoles = targetedUpdate
+    ? getAssetsForRoles(rolesToUpdate)
+    : getAssetsForRoles(["installer", ...INSTALLABLE_PACKAGE_ROLES]);
+
+  return {
+    targetedUpdate,
+    rolesToUpdate,
+    packageRoles,
+    assetRoles,
+    shouldRunPreinstallCleanup: !targetedUpdate,
+    shouldCleanupSelectedManagedPackages: targetedUpdate,
+    shouldCleanupManagedPackages: !targetedUpdate,
+    shouldBootstrapInstaller:
+      !targetedUpdate || rolesToUpdate.includes("installer"),
+    shouldDisableConfiguredPackages: !targetedUpdate,
+    shouldSetHomeActivity: !targetedUpdate,
+  };
+}
+
 export async function runInstallOperation(
   options: InstallOperationOptions,
   internals: InstallOperationInternals = defaultInstallInternals,
 ): Promise<InstallOperationResult> {
   const warnings: OperationWarning[] = [];
   const deviceTransport = createTimedAdbSessionTransport(options.transport);
+  const installPlan = createInstallPlan(options);
   let destructiveWorkStarted = false;
   let failedPhase: InstallOperationPhase | null = null;
   let timedOut = false;
 
-  const emitProgress = (progressOptions: Parameters<typeof emitPhaseProgress>[1]) => {
+  const emitProgress = (
+    progressOptions: Parameters<typeof emitPhaseProgress>[1],
+  ) => {
     if (timedOut) {
       return;
     }
@@ -199,45 +309,66 @@ export async function runInstallOperation(
       message: "Downloading install assets.",
       phaseIndex: 0,
       phaseCompleted: 0,
-      phaseTotal: 5,
+      phaseTotal: installPlan.assetRoles.length,
       phaseUnitLabel: "assets",
       logEntry: true,
     });
 
-    const downloadedAssets = await internals.downloadInstallTargetAssets(options.target, {
-      fetchImpl: options.fetchImpl,
-      onAssetProgress: ({ assetName, assetIndex, assetCount, bytesLoaded, bytesTotal }) => {
-        const assetCompleted = assetIndex + (bytesTotal && bytesTotal > 0 ? bytesLoaded / bytesTotal : 0);
-        const assetLabel = assetIndex + 1;
-        emitPhaseProgress(options.onProgress, {
-          phase: "Assets",
-          message: `Downloading ${getShortAssetLabel(assetName)} (${assetLabel} of ${assetCount})`,
-          phaseIndex: 0,
-          phaseCompleted: assetCompleted,
-          phaseTotal: assetCount,
-          phaseUnitLabel: "assets",
-          bytes: {
-            loaded: bytesLoaded,
-            total: bytesTotal,
-          },
-          logEntry: bytesLoaded === 0 || (bytesTotal !== null && bytesLoaded === bytesTotal),
-        });
+    const downloadedAssets = await internals.downloadInstallTargetAssets(
+      options.target,
+      {
+        fetchImpl: options.fetchImpl,
+        assetRoles: installPlan.assetRoles,
+        onAssetProgress: ({
+          assetName,
+          assetIndex,
+          assetCount,
+          bytesLoaded,
+          bytesTotal,
+        }) => {
+          const assetCompleted =
+            assetIndex +
+            (bytesTotal && bytesTotal > 0 ? bytesLoaded / bytesTotal : 0);
+          const assetLabel = assetIndex + 1;
+          emitPhaseProgress(options.onProgress, {
+            phase: "Assets",
+            message: `Downloading ${getShortAssetLabel(assetName)} (${assetLabel} of ${assetCount})`,
+            phaseIndex: 0,
+            phaseCompleted: assetCompleted,
+            phaseTotal: assetCount,
+            phaseUnitLabel: "assets",
+            bytes: {
+              loaded: bytesLoaded,
+              total: bytesTotal,
+            },
+            logEntry:
+              bytesLoaded === 0 ||
+              (bytesTotal !== null && bytesLoaded === bytesTotal),
+          });
+        },
       },
-    });
+    );
 
     emitPhaseProgress(options.onProgress, {
       phase: "Assets",
       message: "Install assets downloaded.",
       phaseIndex: 0,
-      phaseCompleted: 5,
-      phaseTotal: 5,
+      phaseCompleted: installPlan.assetRoles.length,
+      phaseTotal: installPlan.assetRoles.length,
       phaseUnitLabel: "assets",
       logEntry: true,
     });
 
     failedPhase = "Cleanup";
     destructiveWorkStarted = true;
-    const cleanupSteps = PREINSTALL_CLEANUP_COMMANDS.length + 1;
+    const cleanupSteps =
+      (installPlan.shouldRunPreinstallCleanup
+        ? PREINSTALL_CLEANUP_COMMANDS.length
+        : 0) +
+      (installPlan.shouldCleanupManagedPackages ||
+      installPlan.shouldCleanupSelectedManagedPackages
+        ? 1
+        : 0);
     let cleanupCompleted = 0;
     emitProgress({
       phase: "Cleanup",
@@ -248,29 +379,90 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    for (const command of PREINSTALL_CLEANUP_COMMANDS) {
+    if (installPlan.shouldRunPreinstallCleanup) {
+      for (const command of PREINSTALL_CLEANUP_COMMANDS) {
+        emitProgress({
+          phase: "Cleanup",
+          message: `Running pre-install cleanup: ${command.description ?? command.argv.join(" ")}.`,
+          phaseIndex: 1,
+          phaseCompleted: cleanupCompleted,
+          phaseTotal: cleanupSteps,
+          phaseUnitLabel: "step",
+          logEntry: true,
+        });
+        const result = await internals.runPreinstallCleanupCommand(
+          deviceTransport,
+          command,
+        );
+        cleanupCompleted += 1;
+        if (!result.success) {
+          warnings.push({
+            code: "preinstall-cleanup-command-failed",
+            message: result.message,
+          });
+        }
+        emitProgress({
+          phase: "Cleanup",
+          message: result.success
+            ? `Pre-install cleanup finished: ${command.description ?? command.argv.join(" ")}.`
+            : `Pre-install cleanup warning: ${result.message}`,
+          phaseIndex: 1,
+          phaseCompleted: cleanupCompleted,
+          phaseTotal: cleanupSteps,
+          phaseUnitLabel: "step",
+          logEntry: true,
+        });
+      }
+    }
+    if (installPlan.shouldCleanupManagedPackages) {
       emitProgress({
         phase: "Cleanup",
-        message: `Running pre-install cleanup: ${command.description ?? command.argv.join(" ")}.`,
+        message: "Removing managed packages before reinstall.",
         phaseIndex: 1,
         phaseCompleted: cleanupCompleted,
         phaseTotal: cleanupSteps,
         phaseUnitLabel: "step",
         logEntry: true,
       });
-      const result = await internals.runPreinstallCleanupCommand(deviceTransport, command);
+      await internals.cleanupManagedPackages(deviceTransport);
       cleanupCompleted += 1;
-      if (!result.success) {
-        warnings.push({
-          code: "preinstall-cleanup-command-failed",
-          message: result.message,
-        });
-      }
       emitProgress({
         phase: "Cleanup",
-        message: result.success
-          ? `Pre-install cleanup finished: ${command.description ?? command.argv.join(" ")}.`
-          : `Pre-install cleanup warning: ${result.message}`,
+        message: "Managed package cleanup finished.",
+        phaseIndex: 1,
+        phaseCompleted: cleanupCompleted,
+        phaseTotal: cleanupSteps,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    } else if (installPlan.shouldCleanupSelectedManagedPackages) {
+      emitProgress({
+        phase: "Cleanup",
+        message: "Removing selected managed packages before targeted update.",
+        phaseIndex: 1,
+        phaseCompleted: cleanupCompleted,
+        phaseTotal: cleanupSteps,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+      await internals.cleanupSelectedManagedPackages(
+        deviceTransport,
+        installPlan.rolesToUpdate,
+      );
+      cleanupCompleted += 1;
+      emitProgress({
+        phase: "Cleanup",
+        message: "Selected managed package cleanup finished.",
+        phaseIndex: 1,
+        phaseCompleted: cleanupCompleted,
+        phaseTotal: cleanupSteps,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    } else {
+      emitProgress({
+        phase: "Cleanup",
+        message: "Managed package cleanup skipped for targeted update.",
         phaseIndex: 1,
         phaseCompleted: cleanupCompleted,
         phaseTotal: cleanupSteps,
@@ -278,63 +470,61 @@ export async function runInstallOperation(
         logEntry: true,
       });
     }
-    emitProgress({
-      phase: "Cleanup",
-      message: "Removing managed packages before reinstall.",
-      phaseIndex: 1,
-      phaseCompleted: cleanupCompleted,
-      phaseTotal: cleanupSteps,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
-    await internals.cleanupManagedPackages(deviceTransport);
-    cleanupCompleted += 1;
-    emitProgress({
-      phase: "Cleanup",
-      message: "Managed package cleanup finished.",
-      phaseIndex: 1,
-      phaseCompleted: cleanupCompleted,
-      phaseTotal: cleanupSteps,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
 
     failedPhase = "Bootstrap";
-    emitProgress({
-      phase: "Bootstrap",
-      message: "Bootstrapping final installer package.",
-      phaseIndex: 2,
-      phaseCompleted: 0,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
-    await internals.bootstrapFinalInstaller(
-      deviceTransport,
-      {
-        installerApk: downloadedAssets.installerApk,
-        exploitApk: downloadedAssets.exploitApk,
-      },
-      {
-        onProgress: (event) => emitInstallerProgress(event),
-      },
-    );
-    emitProgress({
-      phase: "Bootstrap",
-      message: "Final installer bootstrapped.",
-      phaseIndex: 2,
-      phaseCompleted: 1,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
+    if (installPlan.shouldBootstrapInstaller) {
+      emitProgress({
+        phase: "Bootstrap",
+        message: "Bootstrapping final installer package.",
+        phaseIndex: 2,
+        phaseCompleted: 0,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+      await internals.bootstrapFinalInstaller(
+        deviceTransport,
+        {
+          installerApk: requireDownloadedAsset(
+            downloadedAssets,
+            "installerApk",
+          ),
+          exploitApk: requireDownloadedAsset(downloadedAssets, "exploitApk"),
+        },
+        {
+          onProgress: (event) => emitInstallerProgress(event),
+        },
+      );
+      emitProgress({
+        phase: "Bootstrap",
+        message: "Final installer bootstrapped.",
+        phaseIndex: 2,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    } else {
+      emitProgress({
+        phase: "Bootstrap",
+        message: "Final installer already matches target; skipping bootstrap.",
+        phaseIndex: 2,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    }
 
     failedPhase = "Install";
-    const installTotal = 3;
+    const installTotal = installPlan.packageRoles.length;
     let installCompleted = 0;
     emitProgress({
       phase: "Install",
-      message: "Installing hook, server, and injector.",
+      message:
+        installTotal > 0
+          ? "Installing selected managed packages."
+          : "Managed packages already match target; skipping package install.",
       phaseIndex: 3,
       phaseCompleted: 0,
       phaseTotal: installTotal,
@@ -342,6 +532,7 @@ export async function runInstallOperation(
       logEntry: true,
     });
     await internals.installManagedPackages(deviceTransport, downloadedAssets, {
+      roles: installPlan.packageRoles,
       onProgress: (event) => {
         if (event.step.startsWith("bootstrap")) {
           emitInstallerProgress(event);
@@ -383,7 +574,10 @@ export async function runInstallOperation(
     });
     emitProgress({
       phase: "Install",
-      message: "Managed package installation finished.",
+      message:
+        installTotal > 0
+          ? "Managed package installation finished."
+          : "Managed package install skipped.",
       phaseIndex: 3,
       phaseCompleted: installTotal,
       phaseTotal: installTotal,
@@ -392,46 +586,72 @@ export async function runInstallOperation(
     });
 
     failedPhase = "Disable";
-    emitProgress({
-      phase: "Disable",
-      message: "Disabling configured stock/system packages.",
-      phaseIndex: 4,
-      phaseCompleted: 0,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
-    warnings.push(...(await internals.disableConfiguredPackages(deviceTransport)));
-    emitProgress({
-      phase: "Disable",
-      message: "Configured stock/system package changes finished.",
-      phaseIndex: 4,
-      phaseCompleted: 1,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
+    if (installPlan.shouldDisableConfiguredPackages) {
+      emitProgress({
+        phase: "Disable",
+        message: "Disabling configured stock/system packages.",
+        phaseIndex: 4,
+        phaseCompleted: 0,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+      warnings.push(
+        ...(await internals.disableConfiguredPackages(deviceTransport)),
+      );
+      emitProgress({
+        phase: "Disable",
+        message: "Configured stock/system package changes finished.",
+        phaseIndex: 4,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    } else {
+      emitProgress({
+        phase: "Disable",
+        message: "Skipping configured package changes for targeted update.",
+        phaseIndex: 4,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    }
 
     failedPhase = "Configure";
-    emitProgress({
-      phase: "Configure",
-      message: "Setting default launcher.",
-      phaseIndex: 5,
-      phaseCompleted: 0,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
-    await internals.setHomeActivity(deviceTransport);
-    emitProgress({
-      phase: "Configure",
-      message: "Default launcher configured.",
-      phaseIndex: 5,
-      phaseCompleted: 1,
-      phaseTotal: 1,
-      phaseUnitLabel: "step",
-      logEntry: true,
-    });
+    if (installPlan.shouldSetHomeActivity) {
+      emitProgress({
+        phase: "Configure",
+        message: "Setting default launcher.",
+        phaseIndex: 5,
+        phaseCompleted: 0,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+      await internals.setHomeActivity(deviceTransport);
+      emitProgress({
+        phase: "Configure",
+        message: "Default launcher configured.",
+        phaseIndex: 5,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    } else {
+      emitProgress({
+        phase: "Configure",
+        message: "Skipping launcher configuration for targeted update.",
+        phaseIndex: 5,
+        phaseCompleted: 1,
+        phaseTotal: 1,
+        phaseUnitLabel: "step",
+        logEntry: true,
+      });
+    }
 
     failedPhase = "Verify";
     emitProgress({
@@ -443,7 +663,10 @@ export async function runInstallOperation(
       phaseUnitLabel: "step",
       logEntry: true,
     });
-    const inspection = await internals.verifyInstalledManagedState(deviceTransport, options.target);
+    const inspection = await internals.verifyInstalledManagedState(
+      deviceTransport,
+      options.target,
+    );
     emitProgress({
       phase: "Verify",
       message: "Verification complete.",
@@ -467,7 +690,8 @@ export async function runInstallOperation(
     };
   } catch (error) {
     timedOut = true;
-    const operationError = error instanceof Error ? error : new Error(String(error));
+    const operationError =
+      error instanceof Error ? error : new Error(String(error));
 
     return {
       success: false,

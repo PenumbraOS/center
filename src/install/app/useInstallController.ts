@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { formatDetectedPackageConflicts } from "../domain/knownPackageConflicts";
-import { inspectInstallState, type InstallInspectionResult } from "../domain/inspection";
-import { resolveInstallTarget, type ResolvedInstallTarget } from "../releases/assets";
+import {
+  inspectInstallState,
+  type InstallInspectionResult,
+} from "../domain/inspection";
+import {
+  resolveInstallTarget,
+  type ResolvedInstallTarget,
+} from "../releases/assets";
 import {
   getLockedTarget,
   lockResolvedInstallTarget,
@@ -57,7 +63,9 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isDeviceStepTimeoutError(error: unknown): error is AdbDeviceStepTimeoutError {
+function isDeviceStepTimeoutError(
+  error: unknown,
+): error is AdbDeviceStepTimeoutError {
   return error instanceof AdbDeviceStepTimeoutError;
 }
 
@@ -71,7 +79,9 @@ function getInspectionTargetResolutionError(
   return new Error(inspection.targetResolutionErrorMessage);
 }
 
-function getActiveTarget(state: InstallControllerState): ResolvedInstallTarget | null {
+function getActiveTarget(
+  state: InstallControllerState,
+): ResolvedInstallTarget | null {
   return getLockedTarget(state.targetLock) ?? state.target;
 }
 
@@ -79,7 +89,9 @@ function isTimedOutOperationError(error: unknown) {
   return isDeviceStepTimeoutError(error);
 }
 
-async function resolvePostOperationInspection<Result extends { readonly error: Error | null }>(
+async function resolvePostOperationInspection<
+  Result extends { readonly error: Error | null },
+>(
   result: Result,
   loadInspection: () => Promise<InstallInspectionResult | null>,
 ) {
@@ -155,7 +167,10 @@ export function useInstallController(
   );
 
   const runInspection = useCallback(
-    async (options?: { stage?: "connecting" | "inspecting"; forceTargetRefresh?: boolean }) => {
+    async (options?: {
+      stage?: "connecting" | "inspecting";
+      forceTargetRefresh?: boolean;
+    }) => {
       const transport = ensureTransport();
       const currentState = stateRef.current;
       const stage = options?.stage ?? "inspecting";
@@ -176,7 +191,9 @@ export function useInstallController(
         let target: ResolvedInstallTarget | null = forceTargetRefresh
           ? null
           : getActiveTarget(currentState);
-        let targetLock: TargetLock | null = forceTargetRefresh ? null : currentState.targetLock;
+        let targetLock: TargetLock | null = forceTargetRefresh
+          ? null
+          : currentState.targetLock;
         let targetResolutionError: Error | null = null;
 
         if (!target) {
@@ -186,7 +203,8 @@ export function useInstallController(
           } catch (error) {
             target = null;
             targetLock = null;
-            targetResolutionError = error instanceof Error ? error : new Error(String(error));
+            targetResolutionError =
+              error instanceof Error ? error : new Error(String(error));
           }
         }
 
@@ -240,7 +258,8 @@ export function useInstallController(
     if (!activeTarget) {
       dispatch({
         type: "operation-failed",
-        error: "Install-type actions are blocked until the installer can resolve a release target.",
+        error:
+          "Install-type actions are blocked until the installer can resolve a release target.",
       });
       return;
     }
@@ -261,10 +280,15 @@ export function useInstallController(
       const result = await runInstallOperation({
         transport,
         target: activeTarget,
+        inspection: currentState.inspection,
         onProgress: (event) => {
           progress.onProgress(event);
 
-          if (progress.isTimedOut() || event.logEntry === false || inspectionRefreshInFlight) {
+          if (
+            progress.isTimedOut() ||
+            event.logEntry === false ||
+            inspectionRefreshInFlight
+          ) {
             return;
           }
 
@@ -294,15 +318,18 @@ export function useInstallController(
         await inspectionRefreshInFlight;
       }
 
-      const nextInspection = await resolvePostOperationInspection(result, async () => {
-        if (result.inspection) {
-          return result.inspection;
-        }
+      const nextInspection = await resolvePostOperationInspection(
+        result,
+        async () => {
+          if (result.inspection) {
+            return result.inspection;
+          }
 
-        return refreshInspection(transport, {
-          target: activeTarget,
-        });
-      });
+          return refreshInspection(transport, {
+            target: activeTarget,
+          });
+        },
+      );
 
       const operationResult: ControllerOperationResult = {
         kind: "install",
@@ -358,7 +385,9 @@ export function useInstallController(
       const nextInspection = await resolvePostOperationInspection(result, () =>
         refreshInspection(transport, {
           target: getActiveTarget(currentState),
-          targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
+          targetResolutionError: getInspectionTargetResolutionError(
+            currentState.inspection,
+          ),
         }),
       );
 
@@ -408,7 +437,9 @@ export function useInstallController(
       const nextInspection = await resolvePostOperationInspection(result, () =>
         refreshInspection(transport, {
           target: getActiveTarget(currentState),
-          targetResolutionError: getInspectionTargetResolutionError(currentState.inspection),
+          targetResolutionError: getInspectionTargetResolutionError(
+            currentState.inspection,
+          ),
         }),
       );
 
@@ -567,16 +598,15 @@ export function useInstallController(
       });
 
       conflictProgress.markTimedOut(conflictResult.error);
-      const inspectionAfterConflictCleanup = await resolvePostOperationInspection(
-        conflictResult,
-        () =>
+      const inspectionAfterConflictCleanup =
+        await resolvePostOperationInspection(conflictResult, () =>
           refreshInspection(transport, {
             target: activeTarget,
             targetResolutionError: getInspectionTargetResolutionError(
               currentState.inspection,
             ),
           }),
-      );
+        );
 
       if (!conflictResult.success) {
         dispatch({
@@ -651,10 +681,15 @@ export function useInstallController(
       const installResult = await runInstallOperation({
         transport,
         target: activeTarget,
+        inspection: inspectionAfterConflictCleanup ?? currentState.inspection,
         onProgress: (event) => {
           installProgress.onProgress(event);
 
-          if (installProgress.isTimedOut() || event.logEntry === false || inspectionRefreshInFlight) {
+          if (
+            installProgress.isTimedOut() ||
+            event.logEntry === false ||
+            inspectionRefreshInFlight
+          ) {
             return;
           }
 
@@ -684,15 +719,18 @@ export function useInstallController(
         await inspectionRefreshInFlight;
       }
 
-      const nextInspection = await resolvePostOperationInspection(installResult, async () => {
-        if (installResult.inspection) {
-          return installResult.inspection;
-        }
+      const nextInspection = await resolvePostOperationInspection(
+        installResult,
+        async () => {
+          if (installResult.inspection) {
+            return installResult.inspection;
+          }
 
-        return refreshInspection(transport, {
-          target: activeTarget,
-        });
-      });
+          return refreshInspection(transport, {
+            target: activeTarget,
+          });
+        },
+      );
 
       const operationResult: ControllerOperationResult = {
         kind: "install",
@@ -746,7 +784,10 @@ export function useInstallController(
 
   useBeforeUnload(state.stage === "operating");
 
-  const commands = useMemo(() => deriveInstallControllerCommands(state), [state]);
+  const commands = useMemo(
+    () => deriveInstallControllerCommands(state),
+    [state],
+  );
 
   return {
     state,

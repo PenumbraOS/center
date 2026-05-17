@@ -1,4 +1,6 @@
 import { MANAGED_PACKAGES } from "../device/packageManager";
+import type { ManagedPackageRole } from "../domain/types";
+import type { DownloadedInstallAssetRole } from "../releases/assets";
 
 export const INSTALL_OPERATION_PHASES = [
   "Assets",
@@ -10,11 +12,20 @@ export const INSTALL_OPERATION_PHASES = [
   "Verify",
 ] as const;
 
-export const UNINSTALL_OPERATION_PHASES = ["Cleanup", "Restore", "Verify"] as const;
-export const ROLLBACK_OPERATION_PHASES = ["Cleanup", "Restore", "Verify"] as const;
+export const UNINSTALL_OPERATION_PHASES = [
+  "Cleanup",
+  "Restore",
+  "Verify",
+] as const;
+export const ROLLBACK_OPERATION_PHASES = [
+  "Cleanup",
+  "Restore",
+  "Verify",
+] as const;
 
 export type InstallOperationPhase = (typeof INSTALL_OPERATION_PHASES)[number];
-export type UninstallOperationPhase = (typeof UNINSTALL_OPERATION_PHASES)[number];
+export type UninstallOperationPhase =
+  (typeof UNINSTALL_OPERATION_PHASES)[number];
 export type RollbackOperationPhase = (typeof ROLLBACK_OPERATION_PHASES)[number];
 
 export type OperationWarningCode =
@@ -36,7 +47,11 @@ export interface OperationProgressBytes {
 }
 
 export interface OperationProgressEvent {
-  readonly phase: InstallOperationPhase | UninstallOperationPhase | RollbackOperationPhase | "Rollback";
+  readonly phase:
+    | InstallOperationPhase
+    | UninstallOperationPhase
+    | RollbackOperationPhase
+    | "Rollback";
   readonly message: string;
   readonly overallPercent: number;
   readonly phasePercent: number;
@@ -68,13 +83,20 @@ export function createOperationProgressEvent(
   options: CreateOperationProgressEventOptions,
 ): OperationProgressEvent {
   const safePhaseTotal = options.phaseTotal > 0 ? options.phaseTotal : 1;
-  const phaseFraction = Math.max(0, Math.min(1, options.phaseCompleted / safePhaseTotal));
-  const computedOverall = ((options.phaseIndex + phaseFraction) / Math.max(options.phaseCount, 1)) * 100;
+  const phaseFraction = Math.max(
+    0,
+    Math.min(1, options.phaseCompleted / safePhaseTotal),
+  );
+  const computedOverall =
+    ((options.phaseIndex + phaseFraction) / Math.max(options.phaseCount, 1)) *
+    100;
 
   return {
     phase: options.phase,
     message: options.message,
-    overallPercent: clampPercent(options.overallOverridePercent ?? computedOverall),
+    overallPercent: clampPercent(
+      options.overallOverridePercent ?? computedOverall,
+    ),
     phasePercent: clampPercent(phaseFraction * 100),
     phaseCompleted: options.phaseCompleted,
     phaseTotal: safePhaseTotal,
@@ -94,24 +116,33 @@ export const MANAGED_CLEANUP_ORDER = [
 
 export const INSTALL_PACKAGE_ORDER = [
   {
+    role: "hook",
     packageName: MANAGED_PACKAGES.hook,
     fileName: "hook.apk",
     assetKey: "hookApk",
     waitForNextInstallProviderReady: true,
   },
   {
+    role: "server",
     packageName: MANAGED_PACKAGES.server,
     fileName: "server.apk",
     assetKey: "serverApk",
     waitForNextInstallProviderReady: true,
   },
   {
+    role: "injector",
     packageName: MANAGED_PACKAGES.injector,
     fileName: "injector.apk",
     assetKey: "injectorApk",
     waitForNextInstallProviderReady: false,
   },
-] as const;
+] as const satisfies readonly {
+  readonly role: ManagedPackageRole;
+  readonly packageName: string;
+  readonly fileName: string;
+  readonly assetKey: DownloadedInstallAssetRole;
+  readonly waitForNextInstallProviderReady: boolean;
+}[];
 
 export const DEFAULT_DISABLE_PACKAGES = [
   "hu.ma.ne.bort",
