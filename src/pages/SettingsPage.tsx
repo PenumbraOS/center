@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [weatherKey, setWeatherKey] = useState("");
   const [trustAllContacts, setTrustAllContacts] = useState(false);
+  const [allowAllInbound, setAllowAllInbound] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function SettingsPage() {
     setSystemPrompt(s.server.system_prompt);
     setWeatherKey("");
     setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
+    setAllowAllInbound(s.contacts?.allow_all_inbound ?? false);
   }, []);
 
   function handleProviderChange(next: string) {
@@ -150,7 +152,11 @@ export default function SettingsPage() {
     }
 
     if (trustAllContacts !== (settings.contacts?.trust_all_contacts ?? false)) {
-      req.contacts = { trust_all_contacts: trustAllContacts };
+      req.contacts = { ...req.contacts, trust_all_contacts: trustAllContacts };
+      hasChanges = true;
+    }
+    if (allowAllInbound !== (settings.contacts?.allow_all_inbound ?? false)) {
+      req.contacts = { ...req.contacts, allow_all_inbound: allowAllInbound };
       hasChanges = true;
     }
 
@@ -421,7 +427,9 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="app-form-field">
+                <div
+                  className={`app-form-field${allowAllInbound ? " app-form-field--disabled" : ""}`}
+                >
                   <span className="app-form-label">Trust All Contacts</span>
                   <label className="app-form-toggle-row">
                     <span className="app-form-toggle-copy">
@@ -431,7 +439,26 @@ export default function SettingsPage() {
                       type="checkbox"
                       className="app-checkbox"
                       checked={trustAllContacts}
+                      disabled={allowAllInbound}
                       onChange={(e) => setTrustAllContacts(e.target.checked)}
+                    />
+                  </label>
+                </div>
+
+                <div className="app-form-field">
+                  <span className="app-form-label">
+                    Allow All Inbound Calls and Messages
+                  </span>
+                  <label className="app-form-toggle-row">
+                    <span className="app-form-toggle-copy">
+                      Allow calls and messages from everyone, even if they are
+                      not in contacts.
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="app-checkbox"
+                      checked={allowAllInbound}
+                      onChange={(e) => setAllowAllInbound(e.target.checked)}
                     />
                   </label>
                 </div>

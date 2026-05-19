@@ -92,6 +92,7 @@ export interface Settings {
   };
   contacts?: {
     trust_all_contacts?: boolean;
+    allow_all_inbound?: boolean;
   };
 }
 
@@ -113,6 +114,7 @@ export interface UpdateSettingsRequest {
   };
   contacts?: {
     trust_all_contacts?: boolean;
+    allow_all_inbound?: boolean;
   };
 }
 

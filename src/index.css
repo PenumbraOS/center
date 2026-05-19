@@ -1777,6 +1777,14 @@ button.app-button--ghost {
   font-size: 0.9rem;
 }
 
+.app-form-field--disabled {
+  opacity: 0.45;
+}
+
+.app-form-field--disabled .app-form-toggle-row {
+  cursor: not-allowed;
+}
+
 .app-save-status {
   font-size: 0.85rem;
   font-weight: 500;
