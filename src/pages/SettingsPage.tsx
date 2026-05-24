@@ -30,6 +30,7 @@ export default function SettingsPage() {
   const [geminiGoogleSearch, setGeminiGoogleSearch] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [statusPrompt, setStatusPrompt] = useState("");
   const [weatherKey, setWeatherKey] = useState("");
   const [trustAllContacts, setTrustAllContacts] = useState(false);
   const [allowAllInbound, setAllowAllInbound] = useState(false);
@@ -52,6 +53,7 @@ export default function SettingsPage() {
     setGeminiGoogleSearch(s.llm.gemini_google_search ?? false);
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
+    setStatusPrompt(s.server.status_prompt ?? "");
     setWeatherKey("");
     setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
     setAllowAllInbound(s.contacts?.allow_all_inbound ?? false);
@@ -142,6 +144,10 @@ export default function SettingsPage() {
     }
     if (systemPrompt !== settings.server.system_prompt) {
       server.system_prompt = systemPrompt;
+      hasChanges = true;
+    }
+    if (statusPrompt !== (settings.server.status_prompt ?? "")) {
+      server.status_prompt = statusPrompt;
       hasChanges = true;
     }
     if (Object.keys(server).length > 0) req.server = server;
@@ -331,9 +337,49 @@ export default function SettingsPage() {
                   <textarea
                     value={systemPrompt}
                     onChange={(e) => setSystemPrompt(e.target.value)}
-                    rows={4}
+                    rows={8}
                     className="app-form-textarea"
                   />
+                  <span className="app-form-help">
+                    Template sent as the first system message. Supports{" "}
+                    <a
+                      href="https://handlebarsjs.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Handlebars substitutions
+                    </a>
+                    :
+                    <br />
+                    Request: {"{{run_id}}"}
+                    <br />
+                    Assistant/server: {"{{assistant_display_name}}"},{" "}
+                    {"{{server_public_addr}}"}
+                    <br />
+                    Time: {"{{current_timestamp}}"}, {"{{current_date}}"},{" "}
+                    {"{{current_time}}"}
+                    <br />
+                    Location: {"{{location_name}}"}, {"{{latitude}}"},{" "}
+                    {"{{longitude}}"}, {"{{coordinates}}"}
+                    <br />
+                    Use conditionals like {"{{#if location_name}}"}...
+                    {"{{/if}}"} for optional values.
+                  </span>
+                </label>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Status Prompt</span>
+                  <textarea
+                    value={statusPrompt}
+                    onChange={(e) => setStatusPrompt(e.target.value)}
+                    rows={8}
+                    className="app-form-textarea"
+                  />
+                  <span className="app-form-help">
+                    Template sent immediately before the user's query to provide
+                    status information. Supports the same substitutions as
+                    System Prompt.
+                  </span>
                 </label>
               </section>
 

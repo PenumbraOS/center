@@ -81,6 +81,7 @@ export interface Settings {
     port: number;
     public_addr?: string;
     system_prompt: string;
+    status_prompt?: string;
     display_name?: string;
   };
   storage: {
@@ -107,6 +108,7 @@ export interface UpdateSettingsRequest {
   };
   server?: {
     system_prompt?: string;
+    status_prompt?: string;
     display_name?: string;
   };
   weather?: {

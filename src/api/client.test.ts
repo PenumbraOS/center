@@ -182,6 +182,93 @@ describe("PinClient.fetchLogs", () => {
   });
 });
 
+describe("PinClient settings APIs", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("loads status prompt from settings", async () => {
+    const settings = {
+      llm: {
+        provider: "openai",
+        model: "gpt-4o-mini",
+        has_api_key: true,
+      },
+      server: {
+        port: 8080,
+        system_prompt: "System instructions",
+        status_prompt: "Status instructions",
+      },
+      storage: {
+        media_dir: "/media",
+        db_path: "/db.sqlite",
+      },
+      weather: {
+        has_api_key: false,
+      },
+    };
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 200, body: JSON.stringify(settings) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await expect(client.getSettings()).resolves.toEqual(settings);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/settings", {
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  it("updates status prompt in settings", async () => {
+    const settings = {
+      llm: {
+        provider: "openai",
+        model: "gpt-4o-mini",
+        has_api_key: true,
+      },
+      server: {
+        port: 8080,
+        system_prompt: "System instructions",
+        status_prompt: "Updated status instructions",
+      },
+      storage: {
+        media_dir: "/media",
+        db_path: "/db.sqlite",
+      },
+      weather: {
+        has_api_key: false,
+      },
+    };
+    const fetchMock = vi.fn(async () =>
+      createTextResponse({ ok: true, status: 200, body: JSON.stringify(settings) }),
+    );
+    const restoreFetch = installFetchMock(fetchMock);
+
+    try {
+      const client = new PinClient(new FetchPinTransport("http://pin.test:8080"));
+      await expect(
+        client.updateSettings({
+          server: { status_prompt: "Updated status instructions" },
+        }),
+      ).resolves.toEqual(settings);
+      expect(fetchMock).toHaveBeenCalledWith("http://pin.test:8080/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          server: { status_prompt: "Updated status instructions" },
+        }),
+        targetAddressSpace: "local",
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+});
+
 describe("PinClient contacts APIs", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
