@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePin } from "../hooks";
 import type { Settings, UpdateSettingsRequest } from "../api";
+import {
+  PackageStatusList,
+  type PackageStatusRowViewModel,
+} from "../components/PackageStatusList";
 import SecretInput from "../components/SecretInput";
 import UnsavedChangesPrompt from "../components/UnsavedChangesPrompt";
 import { logError, logInfo } from "../logging";
@@ -16,9 +20,13 @@ const LLM_PROVIDERS = [
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+function displayVersionValue(value: string | null | undefined) {
+  return value && value.trim() ? value : "Unavailable";
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { client, disconnect } = usePin();
+  const { client, disconnect, device } = usePin();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -525,6 +533,43 @@ export default function SettingsPage() {
                     Manage eSIM
                   </button>
                 </div>
+              </section>
+
+              <section className="app-form-card app-flow--sm">
+                <h2>Device Software</h2>
+                {device?.versions ? (
+                  <>
+                    <PackageStatusList
+                      ariaLabel="Device Software Versions"
+                      rows={[
+                        {
+                          id: "arcos",
+                          role: "arcOS",
+                          value: displayVersionValue(
+                            device.versions.os.humane_display_version,
+                          ),
+                          tone: device.versions.os.humane_display_version
+                            ? "success"
+                            : "warning",
+                        },
+                        ...device.versions.components.map(
+                          (component): PackageStatusRowViewModel => ({
+                            id: component.package_name,
+                            role: component.label,
+                            value: displayVersionValue(component.version_name),
+                            tone: component.version_name
+                              ? "success"
+                              : "warning",
+                          }),
+                        ),
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <p className="home-card-desc">
+                    Device software versions are unavailable from this server.
+                  </p>
+                )}
               </section>
 
               <section className="app-form-card app-flow--sm">

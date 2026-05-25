@@ -62,11 +62,33 @@ export interface ContactClientResetResponse {
   message?: string;
 }
 
+export interface ComponentVersionInfo {
+  role: string;
+  label: string;
+  package_name: string;
+  version_name: string | null;
+}
+
+export interface OsVersionInfo {
+  humane_display_version: string | null;
+  android_release: string | null;
+  android_sdk: string | null;
+  security_patch: string | null;
+}
+
+export interface DeviceVersionSnapshot {
+  components: ComponentVersionInfo[];
+  os: OsVersionInfo;
+}
+
 export interface DeviceInfo {
   display_name: string;
-  server_port: number;
+  server_port?: number;
+  http_bind_addr?: string;
+  grpc_bind_addr?: string;
   llm_provider: string;
   llm_model: string;
+  versions?: DeviceVersionSnapshot;
 }
 
 export interface Settings {

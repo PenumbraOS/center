@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PackageStatusList } from "../../components/PackageStatusList";
 import type { InstallController } from "../app/useInstallController";
 import {
   derivePrimaryCardViewModel,
@@ -258,57 +259,18 @@ export function InstallPrimaryCard({
               ) : null}
             </div>
 
-            {viewModel.packageRows.length > 0 ||
-            viewModel.conflictRows.length > 0 ? (
-              <dl
-                className="install-stage__packages"
-                aria-label="Managed Packages and Detected Conflicts"
-              >
-                {viewModel.packageRows.map((pkg) => (
-                  <div
-                    key={`${pkg.category ?? "managed"}-${pkg.role}`}
-                    className="install-stage__package"
-                  >
-                    <dt>{pkg.role}</dt>
-                    <dd
-                      className={`install-stage__package-value install-stage__package-value--${pkg.tone}`}
-                      title={pkg.value}
-                    >
-                      {pkg.value}
-                    </dd>
-                  </div>
-                ))}
-                {viewModel.conflictRows.length > 0 ? (
-                  <div
-                    className="install-stage__packages-divider"
-                    aria-hidden="true"
-                  >
-                    <span>Installation Conflicts</span>
-                  </div>
-                ) : null}
-                {viewModel.conflictRows.map((pkg) => (
-                  <div
-                    key={`${pkg.category ?? "conflict"}-${pkg.role}`}
-                    className="install-stage__package install-stage__package--conflict"
-                  >
-                    <dt>{pkg.role}</dt>
-                    <dd
-                      className={`install-stage__package-value install-stage__package-value--${pkg.tone}`}
-                      title={pkg.value}
-                    >
-                      <span className="install-stage__package-conflict-copy">
-                        {pkg.value}
-                      </span>
-                      {pkg.badge ? (
-                        <span className="install-stage__package-badge install-stage__package-badge--warning">
-                          {pkg.badge}
-                        </span>
-                      ) : null}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
+            <PackageStatusList
+              ariaLabel="Managed Packages and Detected Conflicts"
+              rows={viewModel.packageRows.map((pkg) => ({
+                id: `${pkg.category ?? "managed"}-${pkg.role}`,
+                ...pkg,
+              }))}
+              conflictRows={viewModel.conflictRows.map((pkg) => ({
+                id: `${pkg.category ?? "conflict"}-${pkg.role}`,
+                ...pkg,
+              }))}
+              topPadding={true}
+            />
           </section>
         ) : null}
       </div>
