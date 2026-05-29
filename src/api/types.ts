@@ -117,6 +117,9 @@ export interface Settings {
     trust_all_contacts?: boolean;
     allow_all_inbound?: boolean;
   };
+  dev?: {
+    apk_install_enabled?: boolean;
+  };
 }
 
 /** Partial update request — only include fields you want to change. */
@@ -139,6 +142,9 @@ export interface UpdateSettingsRequest {
   contacts?: {
     trust_all_contacts?: boolean;
     allow_all_inbound?: boolean;
+  };
+  dev?: {
+    apk_install_enabled?: boolean;
   };
 }
 
@@ -202,9 +208,15 @@ export interface CellularServicePayload {
 }
 
 export interface CellularServiceStatusResponse {
-  type: "cellular.status_result" | "cellular.status_error" | "cellular.status_timeout" | string;
+  type:
+    | "cellular.status_result"
+    | "cellular.status_error"
+    | "cellular.status_timeout"
+    | string;
   request_id?: string | null;
-  payload?: CellularServicePayload | { message?: string; [key: string]: unknown };
+  payload?:
+    | CellularServicePayload
+    | { message?: string; [key: string]: unknown };
   [key: string]: unknown;
 }
 

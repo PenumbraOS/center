@@ -42,6 +42,7 @@ export default function SettingsPage() {
   const [weatherKey, setWeatherKey] = useState("");
   const [trustAllContacts, setTrustAllContacts] = useState(false);
   const [allowAllInbound, setAllowAllInbound] = useState(false);
+  const [apkInstallEnabled, setApkInstallEnabled] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function SettingsPage() {
     setWeatherKey("");
     setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
     setAllowAllInbound(s.contacts?.allow_all_inbound ?? false);
+    setApkInstallEnabled(s.dev?.apk_install_enabled ?? false);
   }, []);
 
   function handleProviderChange(next: string) {
@@ -171,6 +173,11 @@ export default function SettingsPage() {
     }
     if (allowAllInbound !== (settings.contacts?.allow_all_inbound ?? false)) {
       req.contacts = { ...req.contacts, allow_all_inbound: allowAllInbound };
+      hasChanges = true;
+    }
+
+    if (apkInstallEnabled !== (settings.dev?.apk_install_enabled ?? false)) {
+      req.dev = { apk_install_enabled: apkInstallEnabled };
       hasChanges = true;
     }
 
@@ -570,6 +577,25 @@ export default function SettingsPage() {
                     Device software versions are unavailable from this server.
                   </p>
                 )}
+              </section>
+
+              <section className="app-form-card">
+                <h2>Developer</h2>
+
+                <div className="app-form-field">
+                  <span className="app-form-label">Remote APK Install</span>
+                  <label className="app-form-toggle-row">
+                    <span className="app-form-toggle-copy">
+                      Allow this device to accept remote APK uploads over HTTP.
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="app-checkbox"
+                      checked={apkInstallEnabled}
+                      onChange={(e) => setApkInstallEnabled(e.target.checked)}
+                    />
+                  </label>
+                </div>
               </section>
 
               <section className="app-form-card app-flow--sm">
