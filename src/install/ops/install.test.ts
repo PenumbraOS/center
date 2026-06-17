@@ -147,6 +147,12 @@ function createInspection(
         InstallInspectionResult["packages"][keyof InstallInspectionResult["packages"]]["versionComparison"]
       >
     >;
+    readonly packageInstalled?: Partial<
+      Record<keyof InstallInspectionResult["packages"], boolean>
+    >;
+    readonly packageHealthy?: Partial<
+      Record<keyof InstallInspectionResult["packages"], boolean>
+    >;
   } = {},
 ): InstallInspectionResult {
   const action = options.action ?? "Reinstall";
@@ -176,8 +182,8 @@ function createInspection(
       installer: {
         role: "installer",
         packageName: "com.penumbraos.systeminjector",
-        installed: true,
-        healthy: true,
+        installed: options.packageInstalled?.installer ?? true,
+        healthy: options.packageHealthy?.installer ?? true,
         versionName: "2026-04-29.0",
         versionReadable: true,
         querySucceeded: true,
@@ -188,8 +194,8 @@ function createInspection(
       hook: {
         role: "hook",
         packageName: "com.penumbraos.hook",
-        installed: true,
-        healthy: true,
+        installed: options.packageInstalled?.hook ?? true,
+        healthy: options.packageHealthy?.hook ?? true,
         versionName: "2026-04-29.1",
         versionReadable: true,
         querySucceeded: true,
@@ -200,8 +206,8 @@ function createInspection(
       server: {
         role: "server",
         packageName: "com.penumbraos.server",
-        installed: true,
-        healthy: true,
+        installed: options.packageInstalled?.server ?? true,
+        healthy: options.packageHealthy?.server ?? true,
         versionName: "2026-04-29.1",
         versionReadable: true,
         querySucceeded: true,
@@ -212,8 +218,8 @@ function createInspection(
       injector: {
         role: "injector",
         packageName: "com.penumbraos.hook.injector",
-        installed: true,
-        healthy: true,
+        installed: options.packageInstalled?.injector ?? true,
+        healthy: options.packageHealthy?.injector ?? true,
         versionName: "2026-04-29.1",
         versionReadable: true,
         querySucceeded: true,
@@ -411,6 +417,148 @@ describe("runInstallOperation", () => {
       "assets:hookApk,serverApk",
       "cleanup-selected:hook,server",
       "install:hook,server",
+      "verify",
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("repairs only packages that need work", async () => {
+    const calls: string[] = [];
+    const transport = new FakeTransport();
+    const target = createTarget();
+    const inspection = createInspection({
+      action: "Repair",
+      packageInstalled: {
+        server: false,
+      },
+    });
+
+    const result = await runInstallOperation(
+      {
+        transport,
+        target,
+        inspection,
+      },
+      {
+        async downloadInstallTargetAssets(_target, assetOptions) {
+          calls.push(`assets:${assetOptions?.assetRoles?.join(",")}`);
+          return {
+            target,
+            serverApk: new Blob(["server"]),
+          };
+        },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return {
+            success: true,
+            message: command.description ?? command.argv.join(" "),
+          };
+        },
+        async cleanupManagedPackages() {
+          calls.push("cleanup");
+        },
+        async cleanupSelectedManagedPackages(_transport, roles) {
+          calls.push(`cleanup-selected:${roles.join(",")}`);
+        },
+        async bootstrapFinalInstaller() {
+          calls.push("bootstrap");
+        },
+        async installManagedPackages(_transport, _assets, installOptions) {
+          calls.push(`install:${installOptions?.roles?.join(",")}`);
+        },
+        async disableConfiguredPackages() {
+          calls.push("disable");
+          return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
+        async verifyInstalledManagedState() {
+          calls.push("verify");
+          return createInspection();
+        },
+      },
+    );
+
+    expect(calls).toEqual([
+      "assets:serverApk",
+      "cleanup-selected:server",
+      "install:server",
+      "verify",
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("keeps reinstall as a force reinstall even when packages match", async () => {
+    const calls: string[] = [];
+    const transport = new FakeTransport();
+    const target = createTarget();
+    const inspection = createInspection({
+      action: "Reinstall",
+    });
+
+    const result = await runInstallOperation(
+      {
+        transport,
+        target,
+        inspection,
+      },
+      {
+        async downloadInstallTargetAssets(_target, assetOptions) {
+          calls.push(`assets:${assetOptions?.assetRoles?.join(",")}`);
+          return {
+            target,
+            installerApk: new Blob(["installer"]),
+            exploitApk: new Blob(["exploit"]),
+            hookApk: new Blob(["hook"]),
+            serverApk: new Blob(["server"]),
+            injectorApk: new Blob(["injector"]),
+          };
+        },
+        async runPreinstallCleanupCommand(_transport, command) {
+          calls.push(`preinstall:${command.argv.at(-1)}`);
+          return {
+            success: true,
+            message: command.description ?? command.argv.join(" "),
+          };
+        },
+        async cleanupManagedPackages() {
+          calls.push("cleanup");
+        },
+        async cleanupSelectedManagedPackages(_transport, roles) {
+          calls.push(`cleanup-selected:${roles.join(",")}`);
+        },
+        async bootstrapFinalInstaller() {
+          calls.push("bootstrap");
+        },
+        async installManagedPackages(_transport, _assets, installOptions) {
+          calls.push(`install:${installOptions?.roles?.join(",")}`);
+        },
+        async disableConfiguredPackages() {
+          calls.push("disable");
+          return [];
+        },
+        async setHomeActivity() {
+          calls.push("configure");
+        },
+        async verifyInstalledManagedState() {
+          calls.push("verify");
+          return createInspection();
+        },
+      },
+    );
+
+    expect(calls).toEqual([
+      "assets:installerApk,exploitApk,hookApk,serverApk,injectorApk",
+      "preinstall:hu.ma.ne.ironman",
+      "preinstall:humane.experience.onboarding",
+      "preinstall:humane.experience.systemnavigation",
+      'preinstall:setprop persist.log.tag ""',
+      "cleanup",
+      "bootstrap",
+      "install:hook,server,injector",
+      "disable",
+      "configure",
       "verify",
     ]);
     expect(result.success).toBe(true);

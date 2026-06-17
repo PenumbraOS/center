@@ -10,15 +10,19 @@ import { MANAGED_PACKAGES, packageExists } from "./packageManager";
 export const DEVICE_TMP_DIR = "/data/local/tmp";
 export const STAGING_AUTHORITY = "com.penumbraos.systeminjector.staging";
 export const STAGING_URI = `content://${STAGING_AUTHORITY}`;
-export const EXPLOIT_STAGE1_ACTION = "com.penumbraos.systeminjector.exploit.STAGE1";
-export const EXPLOIT_STAGE2_ACTION = "com.penumbraos.systeminjector.exploit.STAGE2";
-export const EXPLOIT_RECEIVER = "com.penumbraos.systeminjector.exploit/.InstallReceiver";
-export const POLL_INTERVAL_MS = 3000;
+export const EXPLOIT_STAGE1_ACTION =
+  "com.penumbraos.systeminjector.exploit.STAGE1";
+export const EXPLOIT_STAGE2_ACTION =
+  "com.penumbraos.systeminjector.exploit.STAGE2";
+export const EXPLOIT_RECEIVER =
+  "com.penumbraos.systeminjector.exploit/.InstallReceiver";
+export const POLL_INTERVAL_MS = 3_000;
 export const POLL_TIMEOUT_MS = DEVICE_STEP_TIMEOUT_MS;
 export const SYSTEM_READY_TIMEOUT_MS = DEVICE_STEP_TIMEOUT_MS;
-export const SYSTEM_READY_POLL_MS = 2000;
-export const SYSTEM_READY_SETTLE_MS = 3000;
-export const SOFT_REBOOT_STABILIZATION_MS = 20000;
+export const SYSTEM_READY_POLL_MS = 2_000;
+export const SYSTEM_READY_SETTLE_MS = 3_000;
+export const SOFT_REBOOT_STABILIZATION_MS = 20_000;
+export const AFTER_INSTALL_TIMEOUT_MS = 180_000;
 
 export interface BootstrapInstallerAssets {
   readonly installerApk: Blob;
@@ -50,6 +54,17 @@ export interface SystemInstallerProgressEvent {
 export interface StageSystemApkInstallOptions {
   readonly packageName?: string;
   readonly waitForNextInstallProviderReady?: boolean;
+  readonly softRebootStabilizationDelayMs?: number;
+  readonly onProgress?: (event: SystemInstallerProgressEvent) => void;
+}
+
+export interface StageSystemApkBatchInstallItem {
+  readonly apk: Blob;
+  readonly name: string;
+  readonly packageName?: string;
+}
+
+export interface StageSystemApkBatchInstallOptions {
   readonly softRebootStabilizationDelayMs?: number;
   readonly onProgress?: (event: SystemInstallerProgressEvent) => void;
 }
@@ -108,7 +123,9 @@ function shellSingleQuote(value: string): string {
   return "'" + value.replaceAll("'", "'\\''") + "'";
 }
 
-function isDeviceStepTimeoutError(error: unknown): error is AdbDeviceStepTimeoutError {
+function isDeviceStepTimeoutError(
+  error: unknown,
+): error is AdbDeviceStepTimeoutError {
   return error instanceof AdbDeviceStepTimeoutError;
 }
 
@@ -161,7 +178,9 @@ export async function waitForPackageManagerReady(
     await sleep(pollMs);
   }
 
-  throw new Error(`Timed out after ${timeoutMs}ms waiting for PackageManagerService.`);
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for PackageManagerService.`,
+  );
 }
 
 export async function waitForSoftRebootStabilization(
@@ -178,19 +197,20 @@ async function waitForSoftRebootRecovery(
   transport: AdbSessionTransport,
   delayMs = SOFT_REBOOT_STABILIZATION_MS,
 ): Promise<void> {
-  await withDeviceStepTimeout(
-    "soft reboot recovery",
-    async () => {
-      await waitForSoftRebootStabilization(delayMs);
-      await waitForDeviceReady(transport, DEVICE_STEP_TIMEOUT_MS, SYSTEM_READY_POLL_MS);
-      await waitForPackageManagerReady(
-        transport,
-        DEVICE_STEP_TIMEOUT_MS,
-        SYSTEM_READY_POLL_MS,
-        SYSTEM_READY_SETTLE_MS,
-      );
-    },
-  );
+  await withDeviceStepTimeout("soft reboot recovery", async () => {
+    await waitForSoftRebootStabilization(delayMs);
+    await waitForDeviceReady(
+      transport,
+      DEVICE_STEP_TIMEOUT_MS,
+      SYSTEM_READY_POLL_MS,
+    );
+    await waitForPackageManagerReady(
+      transport,
+      DEVICE_STEP_TIMEOUT_MS,
+      SYSTEM_READY_POLL_MS,
+      SYSTEM_READY_SETTLE_MS,
+    );
+  });
 }
 
 export async function pollForPackage(
@@ -230,7 +250,12 @@ export async function waitForStagingProviderReady(
   while (Date.now() - start < timeoutMs) {
     try {
       const probeUri = `content://${authority}/provider-ready-probe.apk`;
-      const result = await transport.shell(["content", "query", "--uri", probeUri]);
+      const result = await transport.shell([
+        "content",
+        "query",
+        "--uri",
+        probeUri,
+      ]);
       const output = `${result.stdout}\n${result.stderr}`;
       if (!hasProviderAccessError(output)) {
         return;
@@ -253,7 +278,12 @@ async function waitForPackagePresence(
   packageName: string,
   timeoutMs = POLL_TIMEOUT_MS,
 ): Promise<void> {
-  const found = await pollForPackage(transport, packageName, POLL_INTERVAL_MS, timeoutMs);
+  const found = await pollForPackage(
+    transport,
+    packageName,
+    POLL_INTERVAL_MS,
+    timeoutMs,
+  );
   if (!found) {
     throw new Error(`Timed out waiting for ${packageName} to appear.`);
   }
@@ -316,7 +346,10 @@ export async function bootstrapInstaller(
     "-r",
     `${DEVICE_TMP_DIR}/exploit.apk`,
   ]);
-  ensureShellSuccess(installExploitResult, "Failed to install exploit helper APK.");
+  ensureShellSuccess(
+    installExploitResult,
+    "Failed to install exploit helper APK.",
+  );
 
   options?.onProgress?.({
     step: "bootstrap-wait-exploit",
@@ -351,7 +384,10 @@ export async function bootstrapInstaller(
     step: "bootstrap-wait-stage1-reboot",
     message: "Waiting for soft reboot recovery after bootstrap stage 1.",
   });
-  await waitForSoftRebootRecovery(transport, options?.softRebootStabilizationDelayMs);
+  await waitForSoftRebootRecovery(
+    transport,
+    options?.softRebootStabilizationDelayMs,
+  );
 
   options?.onProgress?.({
     step: "bootstrap-stage2",
@@ -374,7 +410,10 @@ export async function bootstrapInstaller(
     step: "bootstrap-wait-stage2-reboot",
     message: "Waiting for soft reboot recovery after bootstrap stage 2.",
   });
-  await waitForSoftRebootRecovery(transport, options?.softRebootStabilizationDelayMs);
+  await waitForSoftRebootRecovery(
+    transport,
+    options?.softRebootStabilizationDelayMs,
+  );
 
   options?.onProgress?.({
     step: "bootstrap-wait-installer-package",
@@ -388,82 +427,51 @@ export async function bootstrapInstaller(
   });
   await waitForStagingProviderReady(transport);
 
-  await transport.shell(["pm", "uninstall", MANAGED_PACKAGES.exploitHelper]).catch(() => undefined);
+  await transport
+    .shell(["pm", "uninstall", MANAGED_PACKAGES.exploitHelper])
+    .catch(() => undefined);
   await cleanupDeviceTmpApk(transport, deviceApkPath);
   await cleanupDeviceTmpApk(transport, `${DEVICE_TMP_DIR}/exploit.apk`);
 }
 
-export async function stageSystemApkInstall(
+async function stageApkThroughProvider(
   transport: AdbSessionTransport,
   apk: Blob,
   name: string,
-  options: StageSystemApkInstallOptions = {},
-): Promise<StageSystemApkInstallResult> {
-  options.onProgress?.({
-    step: "install-wait-installer",
-    message: `Waiting for installer package readiness before staging ${name}.`,
-  });
-  await waitForPackagePresence(transport, MANAGED_PACKAGES.installer);
-
-  options.onProgress?.({
-    step: "install-wait-provider",
-    message: `Waiting for the staging provider before staging ${name}.`,
-  });
-  await waitForStagingProviderReady(transport);
-
+  onProgress?: (event: SystemInstallerProgressEvent) => void,
+): Promise<void> {
   const stagingFileUri = `${STAGING_URI}/${name}`;
   const deviceTmpPath = `${DEVICE_TMP_DIR}/${name}`;
 
-  options.onProgress?.({
+  onProgress?.({
     step: "install-push-apk",
     message: `Pushing ${name} to the device.`,
   });
   await transport.pushFile(deviceTmpPath, apk);
 
   try {
-    options.onProgress?.({
+    onProgress?.({
       step: "install-stage-apk",
       message: `Staging ${name} through the installer provider.`,
     });
-    const stageResult = await runStageDeviceCopy(transport, deviceTmpPath, stagingFileUri);
+    const stageResult = await runStageDeviceCopy(
+      transport,
+      deviceTmpPath,
+      stagingFileUri,
+    );
     ensureShellSuccess(stageResult, `Failed to stage ${name}`);
   } finally {
     await cleanupDeviceTmpApk(transport, deviceTmpPath);
   }
+}
 
-  options.onProgress?.({
-    step: "install-trigger",
-    message: `Triggering install for ${name}.`,
-  });
-  const installResult = await transport.shell([
-    "content",
-    "call",
-    "--uri",
-    STAGING_URI,
-    "--method",
-    "install",
-    "--arg",
-    name,
-  ]);
-  ensureShellSuccess(installResult, `Failed to trigger install for ${name}`);
-
-  if (installResult.stdout.trim()) {
-    options.onProgress?.({
-      step: "install-trigger",
-      message: `System injector install call stdout: ${installResult.stdout.trim()}`,
-    });
-  }
-  if (installResult.stderr.trim()) {
-    options.onProgress?.({
-      step: "install-trigger",
-      message: `System injector install call stderr: ${installResult.stderr.trim()}`,
-    });
-  }
-
-  const providerOutput = `${installResult.stdout}\n${installResult.stderr}`;
-  const providerMessage = extractProviderMessage(providerOutput);
-  const emptyProviderBundle = hasEmptyProviderBundle(providerOutput);
-  options.onProgress?.({
+function ensureInstallProviderResult(
+  output: string,
+  onProgress?: (event: SystemInstallerProgressEvent) => void,
+): string | null {
+  const providerMessage = extractProviderMessage(output);
+  const emptyProviderBundle = hasEmptyProviderBundle(output);
+  onProgress?.({
     step: "install-trigger",
     message: providerMessage
       ? `System injector provider message: ${providerMessage}`
@@ -472,25 +480,146 @@ export async function stageSystemApkInstall(
         : "System injector provider message could not be extracted from install call output.",
   });
   if (!providerMessage && !emptyProviderBundle) {
-    throw new Error("System injector provider message could not be extracted from install call output.");
+    throw new Error(
+      "System injector provider message could not be extracted from install call output.",
+    );
   }
   if (providerMessage && providerMessage !== "OK") {
     throw new Error(providerMessage);
   }
 
+  return providerMessage;
+}
+
+async function triggerStagedInstall(
+  transport: AdbSessionTransport,
+  installArg: string,
+  fallback: string,
+  onProgress?: (event: SystemInstallerProgressEvent) => void,
+): Promise<string | null> {
+  const installResult = await transport.shell([
+    "content",
+    "call",
+    "--uri",
+    STAGING_URI,
+    "--method",
+    "install",
+    "--arg",
+    installArg,
+  ]);
+  ensureShellSuccess(installResult, fallback);
+
+  if (installResult.stdout.trim()) {
+    onProgress?.({
+      step: "install-trigger",
+      message: `System injector install call stdout: ${installResult.stdout.trim()}`,
+    });
+  }
+  if (installResult.stderr.trim()) {
+    onProgress?.({
+      step: "install-trigger",
+      message: `System injector install call stderr: ${installResult.stderr.trim()}`,
+    });
+  }
+
+  return ensureInstallProviderResult(
+    `${installResult.stdout}\n${installResult.stderr}`,
+    onProgress,
+  );
+}
+
+export async function stageSystemApkBatchInstall(
+  transport: AdbSessionTransport,
+  apks: readonly StageSystemApkBatchInstallItem[],
+  options: StageSystemApkBatchInstallOptions = {},
+): Promise<StageSystemApkInstallResult> {
+  if (apks.length === 0) {
+    throw new Error("No APKs supplied for system install.");
+  }
+
+  options.onProgress?.({
+    step: "install-wait-installer",
+    message: `Waiting for installer package readiness before staging ${apks.length} APK${apks.length === 1 ? "" : "s"}.`,
+  });
+  await waitForPackagePresence(transport, MANAGED_PACKAGES.installer);
+
+  options.onProgress?.({
+    step: "install-wait-provider",
+    message: `Waiting for the staging provider before staging ${apks.length} APK${apks.length === 1 ? "" : "s"}.`,
+  });
+  await waitForStagingProviderReady(transport);
+
+  for (const item of apks) {
+    await stageApkThroughProvider(
+      transport,
+      item.apk,
+      item.name,
+      options.onProgress,
+    );
+  }
+
+  const installArg = apks.map((item) => item.name).join(",");
+  options.onProgress?.({
+    step: "install-trigger",
+    message: `Triggering batch install for ${apks.length} APK${apks.length === 1 ? "" : "s"}.`,
+  });
+  const providerMessage = await triggerStagedInstall(
+    transport,
+    installArg,
+    `Failed to trigger batch install for ${apks.length} APK${apks.length === 1 ? "" : "s"}.`,
+    options.onProgress,
+  );
+
   options.onProgress?.({
     step: "install-wait-package-manager",
-    message: `Waiting for system services after installing ${name}.`,
+    message: `Waiting for system services after batch install.`,
   });
-  await waitForSoftRebootRecovery(transport, options.softRebootStabilizationDelayMs);
+  await waitForSoftRebootRecovery(
+    transport,
+    options.softRebootStabilizationDelayMs,
+  );
 
-  if (options.packageName) {
+  for (const item of apks) {
+    if (!item.packageName) {
+      continue;
+    }
+
     options.onProgress?.({
       step: "install-wait-target-package",
-      message: `Waiting for package ${options.packageName} after installing ${name}.`,
+      message: `Waiting for package ${item.packageName} after batch install.`,
     });
-    await waitForPackagePresence(transport, options.packageName);
+    await waitForPackagePresence(
+      transport,
+      item.packageName,
+      AFTER_INSTALL_TIMEOUT_MS,
+    );
   }
+
+  return {
+    message: providerMessage,
+  };
+}
+
+export async function stageSystemApkInstall(
+  transport: AdbSessionTransport,
+  apk: Blob,
+  name: string,
+  options: StageSystemApkInstallOptions = {},
+): Promise<StageSystemApkInstallResult> {
+  const result = await stageSystemApkBatchInstall(
+    transport,
+    [
+      {
+        apk,
+        name,
+        packageName: options.packageName,
+      },
+    ],
+    {
+      softRebootStabilizationDelayMs: options.softRebootStabilizationDelayMs,
+      onProgress: options.onProgress,
+    },
+  );
 
   if (options.waitForNextInstallProviderReady ?? false) {
     options.onProgress?.({
@@ -500,7 +629,5 @@ export async function stageSystemApkInstall(
     await waitForStagingProviderReady(transport);
   }
 
-  return {
-    message: providerMessage,
-  };
+  return result;
 }

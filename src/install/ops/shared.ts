@@ -16,7 +16,7 @@ import {
 } from "../device/packageManager";
 import {
   bootstrapInstaller,
-  stageSystemApkInstall,
+  stageSystemApkBatchInstall,
   type BootstrapInstallerAssets,
   type SystemInstallerProgressEvent,
 } from "../device/systemInstaller";
@@ -167,29 +167,37 @@ export async function installManagedPackages(
     ? INSTALL_PACKAGE_ORDER.filter((entry) => selectedRoles.has(entry.role))
     : INSTALL_PACKAGE_ORDER;
   const total = entries.length;
-  let index = 0;
-  for (const entry of entries) {
+  if (total === 0) {
+    return;
+  }
+
+  entries.forEach((entry, index) => {
     options?.onPackageStart?.({ packageName: entry.packageName, index, total });
-    await withDeviceStepTimeout(`install ${entry.packageName}`, () =>
-      stageSystemApkInstall(
+  });
+
+  await withDeviceStepTimeout(
+    `install ${total} managed package${total === 1 ? "" : "s"}`,
+    () =>
+      stageSystemApkBatchInstall(
         transport,
-        requireDownloadedAsset(downloadedAssets, entry.assetKey),
-        entry.fileName,
-        {
+        entries.map((entry) => ({
+          apk: requireDownloadedAsset(downloadedAssets, entry.assetKey),
+          name: entry.fileName,
           packageName: entry.packageName,
-          waitForNextInstallProviderReady:
-            entry.waitForNextInstallProviderReady,
+        })),
+        {
           onProgress: options?.onProgress,
         },
       ),
-    );
+  );
+
+  entries.forEach((entry, index) => {
     options?.onPackageCompleted?.({
       packageName: entry.packageName,
       index,
       total,
     });
-    index += 1;
-  }
+  });
 }
 
 async function waitForManagedPackageVersions(transport: AdbSessionTransport) {

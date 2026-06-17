@@ -201,11 +201,17 @@ function targetMatchesInspection(
   );
 }
 
-function getRolesToUpdate(
+function getRolesNeedingInstallWork(
   inspection: InstallInspectionResult,
 ): readonly ManagedPackageRole[] {
   return Object.values(inspection.packages)
-    .filter((pkg) => pkg.versionComparison !== "equal")
+    .filter(
+      (pkg) =>
+        !pkg.installed ||
+        !pkg.healthy ||
+        pkg.versionComparison === "older" ||
+        pkg.versionComparison === "unreadable",
+    )
     .map((pkg) => pkg.role);
 }
 
@@ -247,32 +253,34 @@ function requireDownloadedAsset(
 }
 
 function createInstallPlan(options: InstallOperationOptions) {
-  const canTargetUpdate =
-    options.inspection?.actionState.action === "Update" &&
+  const canTargetInstall =
+    options.inspection !== null &&
+    options.inspection !== undefined &&
+    options.inspection.actionState.action !== "Reinstall" &&
     targetMatchesInspection(options.target, options.inspection);
-  const rolesToUpdate = canTargetUpdate
-    ? getRolesToUpdate(options.inspection)
+  const rolesToUpdate = canTargetInstall
+    ? getRolesNeedingInstallWork(options.inspection)
     : [];
-  const targetedUpdate = canTargetUpdate && rolesToUpdate.length > 0;
-  const packageRoles = targetedUpdate
+  const targetedInstall = canTargetInstall && rolesToUpdate.length > 0;
+  const packageRoles = canTargetInstall
     ? INSTALLABLE_PACKAGE_ROLES.filter((role) => rolesToUpdate.includes(role))
     : INSTALLABLE_PACKAGE_ROLES;
-  const assetRoles = targetedUpdate
+  const assetRoles = canTargetInstall
     ? getAssetsForRoles(rolesToUpdate)
     : getAssetsForRoles(["installer", ...INSTALLABLE_PACKAGE_ROLES]);
 
   return {
-    targetedUpdate,
+    targetedUpdate: targetedInstall,
     rolesToUpdate,
     packageRoles,
     assetRoles,
-    shouldRunPreinstallCleanup: !targetedUpdate,
-    shouldCleanupSelectedManagedPackages: targetedUpdate,
-    shouldCleanupManagedPackages: !targetedUpdate,
+    shouldRunPreinstallCleanup: !canTargetInstall,
+    shouldCleanupSelectedManagedPackages: targetedInstall,
+    shouldCleanupManagedPackages: !canTargetInstall,
     shouldBootstrapInstaller:
-      !targetedUpdate || rolesToUpdate.includes("installer"),
-    shouldDisableConfiguredPackages: !targetedUpdate,
-    shouldSetHomeActivity: !targetedUpdate,
+      !canTargetInstall || rolesToUpdate.includes("installer"),
+    shouldDisableConfiguredPackages: !canTargetInstall,
+    shouldSetHomeActivity: !canTargetInstall,
   };
 }
 
