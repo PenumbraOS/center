@@ -4,6 +4,7 @@ import type {
   CellularSetEnabledResponse,
   ContactClientResetResponse,
   ContactRecord,
+  ConversationDetail,
   DeviceInfo,
   EsimEidResult,
   EsimProfilesResult,
@@ -12,6 +13,7 @@ import type {
   EsimSnapshot,
   HealthInfo,
   MemoryRecord,
+  PaginatedConversations,
   Settings,
   UpdateSettingsRequest,
   WifiSetEnabledResponse,
@@ -103,6 +105,25 @@ export class PinClient {
 
   deleteMemory(uuid: string, signal?: AbortSignal) {
     return this.request<void>(`/api/memories/${uuid}`, { method: "DELETE" }, signal);
+  }
+
+  listConversations(
+    offset = 0,
+    limit = 50,
+    signal?: AbortSignal,
+  ) {
+    const params = new URLSearchParams();
+    params.set("offset", String(offset));
+    params.set("limit", String(limit));
+    return this.request<PaginatedConversations>(
+      `/api/conversations?${params.toString()}`,
+      undefined,
+      signal,
+    );
+  }
+
+  getConversation(id: number, signal?: AbortSignal) {
+    return this.request<ConversationDetail>(`/api/conversations/${id}`, undefined, signal);
   }
 
   listContacts(signal?: AbortSignal) {

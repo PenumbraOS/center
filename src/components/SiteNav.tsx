@@ -7,6 +7,7 @@ interface SiteNavProps {
 
 const ITEMS = [
   { label: "Gallery", to: "/gallery" },
+  { label: "Conversations", to: "/conversations" },
   { label: "Contacts", to: "/contacts" },
   { label: "Settings", to: "/settings" },
 ] as const;

@@ -7,6 +7,8 @@ import Layout from "./components/Layout";
 import { PinProvider, usePin } from "./hooks";
 import ConnectPage from "./pages/ConnectPage";
 import ContactsPage from "./pages/contacts/ContactsPage";
+import ConversationsListPage from "./pages/conversations/ConversationsListPage";
+import ConversationDetailPage from "./pages/conversations/ConversationDetailPage";
 import GalleryPage from "./pages/GalleryPage";
 import MemoryDetailPage from "./pages/MemoryDetailPage";
 import EsimSettingsPage from "./pages/EsimSettingsPage";
@@ -39,6 +41,8 @@ const router = createHashRouter([
       { path: "/connect", element: <ConnectPage /> },
       { path: "/gallery", element: <GalleryPage /> },
       { path: "/gallery/:uuid", element: <MemoryDetailPage /> },
+      { path: "/conversations", element: <ConversationsListPage /> },
+      { path: "/conversations/:id", element: <ConversationDetailPage /> },
       { path: "/contacts", element: <ContactsPage /> },
       { path: "/contacts/new", element: <ContactsPage mode="new" /> },
       { path: "/contacts/:id/edit", element: <ContactsPage mode="edit" /> },

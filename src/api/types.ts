@@ -326,6 +326,29 @@ export interface EsimRequestAcceptedResponse {
 
 export type EsimOperationStatus = "idle" | "pending" | "success" | "error";
 
+export interface ConversationSummary {
+  id: number;
+  run_id: string;
+  created_at: string;
+  utterance: string;
+  is_vision: boolean;
+}
+
+export interface ConversationMessage {
+  role: string;
+  content: string;
+  seq: number;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: ConversationMessage[];
+}
+
+export interface PaginatedConversations {
+  conversations: ConversationSummary[];
+  has_more: boolean;
+}
+
 export type StreamEvent =
   | { type: "memory_created"; memory: MemoryRecord }
   | { type: "memory_completed"; uuid: string }
