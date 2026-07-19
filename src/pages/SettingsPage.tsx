@@ -35,8 +35,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [geminiGoogleSearch, setGeminiGoogleSearch] = useState(false);
-  const [openaiWebSearch, setOpenaiWebSearch] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [statusPrompt, setStatusPrompt] = useState("");
@@ -60,8 +59,7 @@ export default function SettingsPage() {
     setModel(s.llm.model);
     setApiKey("");
     setBaseUrl(s.llm.base_url ?? "");
-    setGeminiGoogleSearch(s.llm.gemini_google_search ?? false);
-    setOpenaiWebSearch(s.llm.openai_web_search ?? false);
+    setWebSearch(s.llm.web_search ?? false);
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
     setStatusPrompt(s.server.status_prompt ?? "");
@@ -83,20 +81,8 @@ export default function SettingsPage() {
       setBaseUrl(
         next === settings.llm.provider ? (settings.llm.base_url ?? "") : "",
       );
-      setGeminiGoogleSearch(
-        next === "gemini" && next === settings.llm.provider
-          ? (settings.llm.gemini_google_search ?? false)
-          : false,
-      );
-      setOpenaiWebSearch(
-        next === "openai" && next === settings.llm.provider
-          ? (settings.llm.openai_web_search ?? false)
-          : false,
-      );
     } else {
       setBaseUrl("");
-      setGeminiGoogleSearch(false);
-      setOpenaiWebSearch(false);
     }
   }
 
@@ -149,12 +135,8 @@ export default function SettingsPage() {
       llm.base_url = baseUrl;
       hasChanges = true;
     }
-    if (geminiGoogleSearch !== (settings.llm.gemini_google_search ?? false)) {
-      llm.gemini_google_search = geminiGoogleSearch;
-      hasChanges = true;
-    }
-    if (openaiWebSearch !== (settings.llm.openai_web_search ?? false)) {
-      llm.openai_web_search = openaiWebSearch;
+    if (webSearch !== (settings.llm.web_search ?? false)) {
+      llm.web_search = webSearch;
       hasChanges = true;
     }
     if (Object.keys(llm).length > 0) req.llm = llm;
@@ -291,8 +273,6 @@ export default function SettingsPage() {
   const isDirty = buildRequest() !== null;
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
   const showModelAndKey = provider !== "echo";
-  const showGeminiGoogleSearch = provider === "gemini";
-  const showOpenaiWebSearch = provider === "openai";
 
   return (
     <>
@@ -442,41 +422,21 @@ export default function SettingsPage() {
                   </label>
                 )}
 
-                {showGeminiGoogleSearch && (
-                  <div className="app-form-field">
-                    <span className="app-form-label">Google Search</span>
-                    <label className="app-form-toggle-row">
-                      <span className="app-form-toggle-copy">
-                        Allow Gemini to use Google Search (may incur additional
-                        costs)
-                      </span>
-                      <input
-                        type="checkbox"
-                        className="app-checkbox"
-                        checked={geminiGoogleSearch}
-                        onChange={(e) =>
-                          setGeminiGoogleSearch(e.target.checked)
-                        }
-                      />
-                    </label>
-                  </div>
-                )}
-
-                {showOpenaiWebSearch && (
+                {showModelAndKey && (
                   <div className="app-form-field">
                     <span className="app-form-label">Web Search</span>
                     <label className="app-form-toggle-row">
                       <span className="app-form-toggle-copy">
-                        Allow OpenAI's hosted web search tool (may incur
-                        additional costs)
+                        Allow the model to search the web. Only takes effect
+                        for Gemini (Google Search) and OpenAI (hosted web
+                        search); ignored for other providers. May incur
+                        additional costs.
                       </span>
                       <input
                         type="checkbox"
                         className="app-checkbox"
-                        checked={openaiWebSearch}
-                        onChange={(e) =>
-                          setOpenaiWebSearch(e.target.checked)
-                        }
+                        checked={webSearch}
+                        onChange={(e) => setWebSearch(e.target.checked)}
                       />
                     </label>
                   </div>
