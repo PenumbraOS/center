@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [geminiGoogleSearch, setGeminiGoogleSearch] = useState(false);
+  const [openaiWebSearch, setOpenaiWebSearch] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [statusPrompt, setStatusPrompt] = useState("");
@@ -60,6 +61,7 @@ export default function SettingsPage() {
     setApiKey("");
     setBaseUrl(s.llm.base_url ?? "");
     setGeminiGoogleSearch(s.llm.gemini_google_search ?? false);
+    setOpenaiWebSearch(s.llm.openai_web_search ?? false);
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
     setStatusPrompt(s.server.status_prompt ?? "");
@@ -86,9 +88,15 @@ export default function SettingsPage() {
           ? (settings.llm.gemini_google_search ?? false)
           : false,
       );
+      setOpenaiWebSearch(
+        next === "openai" && next === settings.llm.provider
+          ? (settings.llm.openai_web_search ?? false)
+          : false,
+      );
     } else {
       setBaseUrl("");
       setGeminiGoogleSearch(false);
+      setOpenaiWebSearch(false);
     }
   }
 
@@ -143,6 +151,10 @@ export default function SettingsPage() {
     }
     if (geminiGoogleSearch !== (settings.llm.gemini_google_search ?? false)) {
       llm.gemini_google_search = geminiGoogleSearch;
+      hasChanges = true;
+    }
+    if (openaiWebSearch !== (settings.llm.openai_web_search ?? false)) {
+      llm.openai_web_search = openaiWebSearch;
       hasChanges = true;
     }
     if (Object.keys(llm).length > 0) req.llm = llm;
@@ -280,6 +292,7 @@ export default function SettingsPage() {
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
   const showModelAndKey = provider !== "echo";
   const showGeminiGoogleSearch = provider === "gemini";
+  const showOpenaiWebSearch = provider === "openai";
 
   return (
     <>
@@ -443,6 +456,26 @@ export default function SettingsPage() {
                         checked={geminiGoogleSearch}
                         onChange={(e) =>
                           setGeminiGoogleSearch(e.target.checked)
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {showOpenaiWebSearch && (
+                  <div className="app-form-field">
+                    <span className="app-form-label">Web Search</span>
+                    <label className="app-form-toggle-row">
+                      <span className="app-form-toggle-copy">
+                        Allow OpenAI's hosted web search tool (may incur
+                        additional costs)
+                      </span>
+                      <input
+                        type="checkbox"
+                        className="app-checkbox"
+                        checked={openaiWebSearch}
+                        onChange={(e) =>
+                          setOpenaiWebSearch(e.target.checked)
                         }
                       />
                     </label>
