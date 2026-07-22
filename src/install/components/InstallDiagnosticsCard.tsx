@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { formatDetectedPackageConflict } from "../domain/knownPackageConflicts";
-import type { InstallController } from "../app/useInstallController";
+import type { FlowContext } from "../flow/engine";
+import { STEP } from "../flow/constants";
 import {
   createInstallSupportBundleFiles,
   downloadSupportBundleFile,
@@ -56,14 +57,21 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function InstallDiagnosticsCard({
-  controller,
+  context,
+  value,
+  getLogcatContent,
 }: {
-  controller: InstallController;
+  context: FlowContext;
+  value: string;
+  getLogcatContent: () => Promise<string>;
 }) {
-  const { state } = controller;
-  const packages = getManagedPackageSnapshots(state.inspection);
-  const supportFiles = createInstallSupportBundleFiles(state, controller);
-  const isError = state.stage === "error";
+  const inspection = context.device?.inspection ?? null;
+  const packages = getManagedPackageSnapshots(inspection);
+  const supportFiles = createInstallSupportBundleFiles(
+    { context, value },
+    getLogcatContent,
+  );
+  const isError = value === STEP.error;
 
   return (
     <details className="install-diagnostics" open={isError}>
@@ -110,19 +118,19 @@ export function InstallDiagnosticsCard({
           </Section>
         ) : null}
 
-        {state.inspection ? (
+        {inspection ? (
           <Section title="Device">
             <dl className="install-diagnostics__kv">
               <KvRow
                 label="Manufacturer"
-                value={state.inspection.device.manufacturer}
+                value={inspection.device.manufacturer}
               />
-              <KvRow label="Model" value={state.inspection.device.model} />
-              <KvRow label="Product" value={state.inspection.device.product} />
+              <KvRow label="Model" value={inspection.device.model} />
+              <KvRow label="Product" value={inspection.device.product} />
               <KvRow
                 label="Build Fingerprint"
                 value={
-                  state.inspection.device.buildFingerprint || "Unavailable"
+                  inspection.device.buildFingerprint || "Unavailable"
                 }
                 mono
               />
@@ -130,7 +138,7 @@ export function InstallDiagnosticsCard({
           </Section>
         ) : null}
 
-        {state.inspection ? (
+        {inspection ? (
           <Section title="Managed Packages">
             {packages.map((pkg) => (
               <div key={pkg.role} className="install-diagnostics__package">
@@ -170,10 +178,10 @@ export function InstallDiagnosticsCard({
           </Section>
         ) : null}
 
-        {state.inspection?.hasDetectedConflicts ? (
+        {inspection?.hasDetectedConflicts ? (
           <Section title="Known Conflicts">
             <dl className="install-diagnostics__kv">
-              {state.inspection.detectedConflicts.map((conflict) => (
+              {inspection.detectedConflicts.map((conflict) => (
                 <KvRow
                   key={conflict.id}
                   label={conflict.label}
@@ -185,72 +193,70 @@ export function InstallDiagnosticsCard({
           </Section>
         ) : null}
 
-        {state.target ? (
+        {context.device?.target ? (
           <Section title="Release Target">
             <dl className="install-diagnostics__kv">
               <KvRow
                 label="System Injector"
-                value={state.target.systemInjector.release.tagName}
+                value={context.device.target.systemInjector.release.tagName}
               />
               <KvRow
                 label="Humane Hook"
-                value={state.target.humaneSystemHook.release.tagName}
+                value={context.device.target.humaneSystemHook.release.tagName}
               />
               <KvRow
                 label="Installer"
-                value={state.target.systemInjector.assets.installerApk.name}
+                value={context.device.target.systemInjector.assets.installerApk.name}
                 mono
               />
               <KvRow
                 label="Exploit"
-                value={state.target.systemInjector.assets.exploitApk.name}
+                value={context.device.target.systemInjector.assets.exploitApk.name}
                 mono
               />
               <KvRow
                 label="Hook"
-                value={state.target.humaneSystemHook.assets.hookApk.name}
+                value={context.device.target.humaneSystemHook.assets.hookApk.name}
                 mono
               />
               <KvRow
                 label="Server"
-                value={state.target.humaneSystemHook.assets.serverApk.name}
+                value={context.device.target.humaneSystemHook.assets.serverApk.name}
                 mono
               />
               <KvRow
                 label="Injector"
-                value={state.target.humaneSystemHook.assets.injectorApk.name}
+                value={context.device.target.humaneSystemHook.assets.injectorApk.name}
                 mono
               />
               <KvRow
                 label="Locked At"
-                value={state.targetLock?.lockedAt ?? "Not locked"}
+                value={context.device.targetLock?.lockedAt ?? "Not locked"}
               />
             </dl>
           </Section>
         ) : null}
 
-        {state.lastOperationResult ? (
+        {context.run.lastResult ? (
           <Section title="Last Operation">
             <dl className="install-diagnostics__kv">
-              <KvRow label="Action" value={state.lastOperationResult.kind} />
+              <KvRow label="Action" value={context.run.lastResult.operation} />
               <KvRow
                 label="Success"
-                value={state.lastOperationResult.result.success ? "Yes" : "No"}
+                value={context.run.lastResult.success ? "Yes" : "No"}
               />
               <KvRow
                 label="Warnings"
-                value={state.lastOperationResult.result.warnings.length}
+                value={context.run.lastResult.warnings.length}
               />
-              {"failedPhase" in state.lastOperationResult.result ? (
-                <KvRow
-                  label="Failed Phase"
-                  value={state.lastOperationResult.result.failedPhase ?? "None"}
-                />
-              ) : null}
-              {state.lastOperationResult.result.error ? (
+              <KvRow
+                label="Failed Phase"
+                value={context.run.lastResult.failedPhase ?? "None"}
+              />
+              {context.run.lastResult.error ? (
                 <KvRow
                   label="Error"
-                  value={state.lastOperationResult.result.error.message}
+                  value={context.run.lastResult.error.message}
                 />
               ) : null}
             </dl>
@@ -258,9 +264,9 @@ export function InstallDiagnosticsCard({
         ) : null}
 
         <Section title="Activity Log">
-          {state.progressEntries.length > 0 ? (
+          {context.run.progressEntries.length > 0 ? (
             <ul className="install-diagnostics__log">
-              {state.progressEntries.map((entry) => (
+              {context.run.progressEntries.map((entry) => (
                 <li key={entry.id} className="install-diagnostics__log-entry">
                   <span className="install-diagnostics__log-phase">
                     {entry.phase}

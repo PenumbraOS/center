@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import type { InstallController } from "../app/useInstallController";
 import type { AdbPtySession } from "../device/adbTransport";
 import { useBeforeUnload } from "../../hooks/useBeforeUnload";
 
@@ -11,10 +10,12 @@ const TERMINAL_ROWS = 24;
 type TerminalStatus = "closed" | "opening" | "open" | "exited" | "error";
 
 export function InstallTerminalCard({
-  controller,
+  openTerminalSession,
+  connected,
   onBack,
 }: {
-  controller: InstallController;
+  openTerminalSession: () => Promise<AdbPtySession>;
+  connected: boolean;
   onBack: () => void;
 }) {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -49,7 +50,7 @@ export function InstallTerminalCard({
     setStatus("opening");
 
     try {
-      const session = await controller.openTerminalSession();
+      const session = await openTerminalSession();
       if (attemptId !== openAttemptRef.current) {
         await session.close().catch(() => undefined);
         return;
@@ -168,7 +169,7 @@ export function InstallTerminalCard({
       terminalHostRef.current?.replaceChildren();
       setStatus("error");
     }
-  }, [closeTerminal, controller]);
+  }, [closeTerminal, openTerminalSession]);
 
   useEffect(() => {
     void openTerminal().catch(() => undefined);
@@ -179,14 +180,14 @@ export function InstallTerminalCard({
   }, [closeTerminal, openTerminal]);
 
   useEffect(() => {
-    if (controller.state.connection !== null) {
+    if (connected) {
       return;
     }
 
     void closeTerminal().finally(() => {
       onBack();
     });
-  }, [closeTerminal, controller.state.connection, onBack]);
+  }, [closeTerminal, connected, onBack]);
 
   async function handleBack() {
     await closeTerminal();

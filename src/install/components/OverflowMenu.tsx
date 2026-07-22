@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { PrimaryCardActionViewModel } from "../presentation/primaryCardViewModel";
+import type { ViewButton } from "../flow/view";
 
 export function OverflowMenu({
   actions,
   onAction,
 }: {
-  actions: readonly PrimaryCardActionViewModel[];
-  onAction: (action: PrimaryCardActionViewModel) => void;
+  actions: readonly ViewButton[];
+  onAction: (action: ViewButton) => void;
 }) {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement | null>(null);

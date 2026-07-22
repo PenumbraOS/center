@@ -1,12 +1,8 @@
 import { useRef } from "react";
 import { AppDialog } from "../../components/AppDialog";
-import type {
-  InstallConfirmationChoiceAction,
-  InstallConfirmationDialog,
-  InstallConfirmationRequirement,
-} from "../app/useInstallActionConfirmation";
+import type { ViewDialog, ViewDialogRequirement, Press } from "../flow/view";
 
-function getRequirementToneClass(requirement: InstallConfirmationRequirement) {
+function getRequirementToneClass(requirement: ViewDialogRequirement) {
   if (requirement.kind === "risk") {
     return "install-dialog__requirement--danger";
   }
@@ -26,9 +22,9 @@ export function ConfirmActionModal({
   onCancel,
   onConfirm,
 }: {
-  dialog: InstallConfirmationDialog | null;
-  onCancel: () => void;
-  onConfirm: (action: InstallConfirmationChoiceAction) => void | Promise<void>;
+  dialog: ViewDialog | null;
+  onCancel: (press: Press | null) => void;
+  onConfirm: (press: Press) => void;
 }) {
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -39,7 +35,7 @@ export function ConfirmActionModal({
       labelledBy="install-confirm-title"
       describedBy="install-confirm-copy"
       initialFocusRef={confirmButtonRef}
-      onDismiss={onCancel}
+      onDismiss={() => onCancel(null)}
       closeOnEscape
       lockBodyScroll
     >
@@ -76,19 +72,17 @@ export function ConfirmActionModal({
             <button
               type="button"
               className="install-dialog__button install-dialog__button--ghost"
-              onClick={onCancel}
+              onClick={() => onCancel(null)}
             >
               Cancel
             </button>
-            {dialog.choices?.map((choice) => (
+            {dialog.choices.map((choice) => (
               <button
-                key={`${choice.action}-${choice.label}`}
+                key={choice.label}
                 ref={choice.recommended ? confirmButtonRef : undefined}
                 type="button"
                 className={`install-dialog__button install-dialog__button--${choice.tone}`}
-                onClick={() => {
-                  void onConfirm(choice.action);
-                }}
+                onClick={() => onConfirm(choice.press)}
               >
                 {choice.label}
               </button>

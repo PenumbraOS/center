@@ -1,5 +1,5 @@
-import type { InstallController } from "../app/useInstallController";
-import type { InstallControllerState } from "../app/state";
+import type { FlowContext } from "../flow/engine";
+import { STEP, OPERATION } from "../flow/constants";
 import { getManagedPackageSnapshots } from "./managedPackages";
 
 export interface SupportBundleFile {
@@ -16,14 +16,12 @@ interface SerializedError {
 }
 
 interface SerializedOperationResult {
-  readonly kind: "install" | "uninstall" | "remove-conflicts";
+  readonly operation: string;
   readonly result: {
     readonly success: boolean;
     readonly warnings: readonly unknown[];
     readonly error: SerializedError | null;
     readonly failedPhase?: string | null;
-    readonly rollbackAttempted?: boolean;
-    readonly rollbackSucceeded?: boolean;
     readonly rollbackAvailable?: boolean;
     readonly removedPackageIds?: readonly string[];
   };
@@ -35,23 +33,28 @@ export interface InstallSupportBundle {
   readonly app: {
     readonly surface: "install";
   };
-  readonly browserSupport: InstallControllerState["browserSupport"];
+  readonly browserSupport: FlowContext["browserSupport"];
   readonly browserContext: {
     readonly href: string | null;
     readonly userAgent: string | null;
     readonly language: string | null;
   };
-  readonly connection: InstallControllerState["connection"];
+  readonly connection: import("../device/adbTransport").AdbConnectionInfo | null;
   readonly stateSummary: {
-    readonly stage: InstallControllerState["stage"];
-    readonly error: InstallControllerState["error"];
-    readonly isBusy: InstallControllerState["isBusy"];
+    readonly stage: string;
+    readonly error: string | null;
+    readonly isBusy: boolean;
   };
-  readonly inspection: InstallControllerState["inspection"];
-  readonly target: InstallControllerState["target"];
-  readonly targetLock: InstallControllerState["targetLock"];
+  readonly inspection: import("../domain/inspection").InstallInspectionResult | null;
+  readonly target: import("../releases/assets").ResolvedInstallTarget | null;
+  readonly targetLock: import("../releases/targetLock").TargetLock | null;
   readonly lastOperationResult: SerializedOperationResult | null;
-  readonly progressEntries: InstallControllerState["progressEntries"];
+  readonly progressEntries: readonly import("../flow/engine").ProgressEntry[];
+}
+
+export interface SupportBundleInput {
+  readonly context: FlowContext;
+  readonly value: string;
 }
 
 function serializeError(error: unknown): SerializedError | null {
@@ -73,35 +76,21 @@ function serializeError(error: unknown): SerializedError | null {
 }
 
 function serializeOperationResult(
-  result: InstallControllerState["lastOperationResult"],
+  result: import("../flow/engine").OperationResult | null,
 ): SerializedOperationResult | null {
   if (!result) {
     return null;
   }
 
-  if (result.kind === "install") {
-    return {
-      kind: result.kind,
-      result: {
-        success: result.result.success,
-        warnings: result.result.warnings,
-        error: serializeError(result.result.error),
-        failedPhase: result.result.failedPhase,
-        rollbackAttempted: result.result.rollbackAttempted,
-        rollbackSucceeded: result.result.rollbackSucceeded,
-        rollbackAvailable: result.result.rollbackAvailable,
-      },
-    };
-  }
-
   return {
-    kind: result.kind,
+    operation: result.operation,
     result: {
-      success: result.result.success,
-      warnings: result.result.warnings,
-      error: serializeError(result.result.error),
-      removedPackageIds:
-        "removedPackageIds" in result.result ? result.result.removedPackageIds : undefined,
+      success: result.success,
+      warnings: result.warnings,
+      error: serializeError(result.error),
+      failedPhase: result.failedPhase,
+      rollbackAvailable: result.rollbackAvailable,
+      ...(result.removedPackageIds ? { removedPackageIds: result.removedPackageIds } : {}),
     },
   };
 }
@@ -118,12 +107,12 @@ export async function downloadSupportBundleFile(file: SupportBundleFile) {
   globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function createProgressLogText(state: InstallControllerState) {
-  if (state.progressEntries.length === 0) {
+function createProgressLogText(context: FlowContext) {
+  if (context.run.progressEntries.length === 0) {
     return "No progress entries captured.\n";
   }
 
-  return `${state.progressEntries
+  return `${context.run.progressEntries
     .map((entry) => {
       const progress =
         entry.overallPercent !== null && entry.phasePercent !== null
@@ -138,46 +127,55 @@ function createProgressLogText(state: InstallControllerState) {
     .join("\n")}\n`;
 }
 
+const OPERATING_STEPS = new Set([
+  STEP.connecting, STEP.inspecting, STEP.assets, STEP.cleanup, STEP.bootstrap,
+  STEP.installApks, STEP.disable, STEP.configure, STEP.verify,
+  STEP.uninstallCleanup, STEP.uninstallRestore, STEP.uninstallVerify,
+  STEP.rollbackCleanup, STEP.rollbackRestore, STEP.rollbackVerify,
+  STEP.conflictsCleanup, STEP.apkFile, STEP.finishOperation,
+]);
+
 export function createInstallSupportBundle(
-  state: InstallControllerState,
+  input: SupportBundleInput,
 ): InstallSupportBundle {
+  const { context, value } = input;
   return {
     schemaVersion: 1,
     capturedAt: new Date().toISOString(),
     app: {
-      surface: "install",
+      surface: OPERATION.install,
     },
-    browserSupport: state.browserSupport,
+    browserSupport: context.browserSupport,
     browserContext: {
       href: typeof location !== "undefined" ? location.href : null,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
       language: typeof navigator !== "undefined" ? navigator.language : null,
     },
-    connection: state.connection,
+    connection: context.device?.connection ?? null,
     stateSummary: {
-      stage: state.stage,
-      error: state.error,
-      isBusy: state.isBusy,
+      stage: value,
+      error: context.run.error,
+      isBusy: OPERATING_STEPS.has(value as any) || context.run.busy,
     },
-    inspection: state.inspection,
-    target: state.target,
-    targetLock: state.targetLock,
-    lastOperationResult: serializeOperationResult(state.lastOperationResult),
-    progressEntries: state.progressEntries,
+    inspection: context.device?.inspection ?? null,
+    target: context.device?.target ?? null,
+    targetLock: context.device?.targetLock ?? null,
+    lastOperationResult: serializeOperationResult(context.run.lastResult),
+    progressEntries: context.run.progressEntries,
   };
 }
 
 export function createInstallSupportBundleFiles(
-  state: InstallControllerState,
-  controller: Pick<InstallController, "getLogcatContent">,
+  input: SupportBundleInput,
+  getLogcatContent: () => Promise<string>,
 ): SupportBundleFile[] {
-  const bundle = createInstallSupportBundle(state);
+  const bundle = createInstallSupportBundle(input);
   const files: SupportBundleFile[] = [
     {
       fileName: "penumbra-logcat.log",
       label: "Logcat Logs",
       mimeType: "text/plain",
-      download: controller.getLogcatContent,
+      download: getLogcatContent,
     },
     {
       fileName: "install-support-bundle.json",
@@ -187,11 +185,11 @@ export function createInstallSupportBundleFiles(
     {
       fileName: "progress-log.txt",
       mimeType: "text/plain",
-      download: async () => createProgressLogText(state),
+      download: async () => createProgressLogText(input.context),
     },
   ];
 
-  for (const pkg of getManagedPackageSnapshots(state.inspection)) {
+  for (const pkg of getManagedPackageSnapshots(input.context.device?.inspection ?? null)) {
     if (!pkg.rawOutput) {
       continue;
     }
