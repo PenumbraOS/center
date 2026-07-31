@@ -24,6 +24,7 @@ const LLM_PROVIDERS = [
 const MUSIC_PROVIDERS = [
   { value: "apple", label: "Apple Music" },
   { value: "spotify", label: "Spotify" },
+  { value: "tidal", label: "Tidal" },
   { value: "mopidy", label: "Mopidy (self-hosted)" },
 ] as const;
 
@@ -117,6 +118,60 @@ export default function SettingsPage() {
   const [spotifyPassword, setSpotifyPassword] = useState("");
   const [mopidyUrl, setMopidyUrl] = useState("");
   const [mopidyStreamUrl, setMopidyStreamUrl] = useState("");
+  const [tidalClientId, setTidalClientId] = useState("");
+  const [tidalClientSecret, setTidalClientSecret] = useState("");
+  const [tidalLogin, setTidalLogin] = useState<
+    "idle" | "waiting" | "done" | "error"
+  >("idle");
+  const [tidalLoginCode, setTidalLoginCode] = useState<{
+    userCode: string;
+    uri: string;
+  } | null>(null);
+  const [tidalLoginError, setTidalLoginError] = useState<string | null>(null);
+
+  /** Tidal device-authorization login: show a code + link.tidal.com, then poll
+   * the Pin until the user finishes. */
+  const handleTidalLogin = useCallback(async () => {
+    if (!client) return;
+    setTidalLogin("waiting");
+    setTidalLoginError(null);
+    setTidalLoginCode(null);
+    try {
+      // The login runs server-side and reads the credentials from config, so
+      // persist anything freshly typed before starting.
+      if (tidalClientId !== "" || tidalClientSecret !== "") {
+        const music: UpdateSettingsRequest["music"] = {};
+        if (tidalClientId !== "") music.tidal_client_id = tidalClientId;
+        if (tidalClientSecret !== "") music.tidal_client_secret = tidalClientSecret;
+        const saved = await client.updateSettings({ music });
+        setSettings(saved);
+      }
+      const start = await client.tidalLoginStart();
+      setTidalLoginCode({ userCode: start.user_code, uri: start.verification_uri });
+      const deadline = Date.now() + start.expires_in * 1000;
+      const intervalMs = Math.max(2, start.interval) * 1000;
+      // Poll until the user authorizes, it expires, or an error occurs.
+      // eslint-disable-next-line no-constant-condition
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, intervalMs));
+        const { done } = await client.tidalLoginPoll(start.device_code);
+        if (done) {
+          const updated = await client.getSettings();
+          setSettings(updated);
+          populateForm(updated);
+          setTidalLogin("done");
+          setTidalLoginCode(null);
+          return;
+        }
+      }
+      throw new Error("Sign-in timed out — try again.");
+    } catch (error) {
+      logError("settings-page", "Tidal login failed", error);
+      setTidalLoginError(error instanceof Error ? error.message : String(error));
+      setTidalLogin("error");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, tidalClientId, tidalClientSecret]);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -246,6 +301,8 @@ export default function SettingsPage() {
     setSpotifyPassword("");
     setMopidyUrl(s.music?.mopidy_url ?? "");
     setMopidyStreamUrl(s.music?.mopidy_stream_url ?? "");
+    setTidalClientId("");
+    setTidalClientSecret("");
   }, []);
 
   function handleProviderChange(next: string) {
@@ -407,6 +464,14 @@ export default function SettingsPage() {
     }
     if (mopidyStreamUrl !== (settings.music?.mopidy_stream_url ?? "")) {
       music.mopidy_stream_url = mopidyStreamUrl;
+      hasChanges = true;
+    }
+    if (tidalClientId !== "") {
+      music.tidal_client_id = tidalClientId;
+      hasChanges = true;
+    }
+    if (tidalClientSecret !== "") {
+      music.tidal_client_secret = tidalClientSecret;
       hasChanges = true;
     }
     if (Object.keys(music).length > 0) req.music = music;
@@ -723,8 +788,9 @@ export default function SettingsPage() {
                     ))}
                   </select>
                   <span className="app-form-help">
-                    Changes apply immediately — no restart needed. Apple Music
-                    plays on-device; Spotify and YouTube stream from the server.
+                    Changes apply immediately — no restart needed. Apple plays
+                    on-device, Tidal plays natively, Spotify streams from the
+                    server, and Mopidy from your own host.
                   </span>
                 </label>
 
@@ -1087,6 +1153,104 @@ export default function SettingsPage() {
                         <span className="app-form-error">
                           {spotifyConnectError}
                         </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {musicProvider === "tidal" && (
+                  <>
+                    <p className="home-card-desc">
+                      The Pin is natively a Tidal client, so Tidal plays with no
+                      embedded player — the device streams it directly. Requires
+                      a Tidal HiFi subscription.
+                    </p>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Tidal Client ID
+                        {settings.music?.tidal_configured ? " (configured)" : ""}
+                        <InfoTooltip label="About Tidal app credentials">
+                          This must be a <strong>limited-input-device</strong>{" "}
+                          (device-flow) client — the kind TVs/streamers use — so
+                          it can reach Tidal's playback API. A regular web/mobile
+                          client fails with "not a Limited Input Device client".
+                          Tidal only issues this type to its own internal apps
+                          (the{" "}
+                          <a
+                            href="https://developer.tidal.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            developer portal
+                          </a>{" "}
+                          gives catalog/metadata clients with playback locked to
+                          their SDK), so a working pair has to be sourced from a
+                          Tidal TV/streamer app (as <code>tidalapi</code> does) —
+                          we don't ship one. Needs a Tidal HiFi subscription.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={tidalClientId}
+                        onChange={(e) => setTidalClientId(e.target.value)}
+                        placeholder="Tidal client id"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <div className="app-form-field">
+                      <span className="app-form-label">Tidal Client Secret</span>
+                      <SecretInput
+                        value={tidalClientSecret}
+                        onChange={setTidalClientSecret}
+                        hasExisting={settings.music?.tidal_configured ?? false}
+                      />
+                      <span className="app-form-help">
+                        Save the client id + secret first, then sign in below.
+                      </span>
+                    </div>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        Tidal Account
+                        {settings.music?.tidal_user_configured
+                          ? " (signed in)"
+                          : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="app-button--file"
+                        onClick={handleTidalLogin}
+                        disabled={tidalLogin === "waiting"}
+                      >
+                        {tidalLogin === "waiting"
+                          ? "Waiting for authorization…"
+                          : settings.music?.tidal_user_configured
+                            ? "Re-sign in with Tidal"
+                            : "Sign in with Tidal"}
+                      </button>
+                      {tidalLoginCode && (
+                        <span className="app-form-help">
+                          Go to{" "}
+                          <a
+                            href={tidalLoginCode.uri}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {tidalLoginCode.uri}
+                          </a>{" "}
+                          and enter code <code>{tidalLoginCode.userCode}</code>.
+                          This page will finish automatically.
+                        </span>
+                      )}
+                      {tidalLogin === "done" && (
+                        <span
+                          className="app-form-help"
+                          style={{ color: "var(--color-beam)" }}
+                        >
+                          Signed in — Tidal is ready.
+                        </span>
+                      )}
+                      {tidalLogin === "error" && tidalLoginError && (
+                        <span className="app-form-error">{tidalLoginError}</span>
                       )}
                     </div>
                   </>

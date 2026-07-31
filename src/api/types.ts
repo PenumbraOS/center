@@ -138,7 +138,21 @@ export interface Settings {
     /** Mopidy server URL + Icecast stream URL (bring-your-own-providers). */
     mopidy_url: string | null;
     mopidy_stream_url: string | null;
+    /** Tidal app credentials present + a user is signed in. */
+    tidal_configured: boolean;
+    tidal_user_configured: boolean;
+    tidal_country_code: string;
+    tidal_quality: string;
   };
+}
+
+/** Tidal device-authorization login start response. */
+export interface TidalLoginStart {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  interval: number;
+  expires_in: number;
 }
 
 /** MusicKit-JS config for the "Sign in with Apple Music" flow. */
@@ -187,6 +201,10 @@ export interface UpdateSettingsRequest {
     spotify_password?: string;
     mopidy_url?: string;
     mopidy_stream_url?: string;
+    tidal_client_id?: string;
+    tidal_client_secret?: string;
+    tidal_country_code?: string;
+    tidal_quality?: string;
   };
 }
 
