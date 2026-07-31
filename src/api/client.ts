@@ -14,7 +14,9 @@ import type {
   HealthInfo,
   MemoryRecord,
   PaginatedConversations,
+  MusicKitConfig,
   Settings,
+  TidalLoginStart,
   UpdateSettingsRequest,
   WifiSetEnabledResponse,
 } from "./types";
@@ -176,6 +178,56 @@ export class PinClient {
 
   getSettings(signal?: AbortSignal) {
     return this.request<Settings>("/api/settings", undefined, signal);
+  }
+
+  /** Developer token + storefront needed to initialize MusicKit JS in the
+   * browser for the "Sign in with Apple Music" flow. */
+  getMusicKitConfig(signal?: AbortSignal) {
+    return this.request<MusicKitConfig>(
+      "/api/music/apple/musickit-config",
+      undefined,
+      signal,
+    );
+  }
+
+  /** Start Tidal's device-authorization login (returns a code for the user to
+   * enter at link.tidal.com). */
+  tidalLoginStart(signal?: AbortSignal) {
+    return this.request<TidalLoginStart>(
+      "/api/music/tidal/login/start",
+      { method: "PUT" },
+      signal,
+    );
+  }
+
+  /** Poll the Tidal login once; `done: true` when the user has authorized. */
+  tidalLoginPoll(deviceCode: string, signal?: AbortSignal) {
+    return this.request<{ done: boolean }>(
+      "/api/music/tidal/login/poll",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_code: deviceCode }),
+      },
+      signal,
+    );
+  }
+
+  /** Complete Spotify OAuth: hand the Pin the authorization code (PKCE) so it
+   * exchanges + stores the refresh token itself. */
+  exchangeSpotifyCode(
+    body: { code: string; code_verifier: string; redirect_uri: string },
+    signal?: AbortSignal,
+  ) {
+    return this.request<{ connected: boolean }>(
+      "/api/music/spotify/exchange",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      signal,
+    );
   }
 
   updateSettings(s: UpdateSettingsRequest, signal?: AbortSignal) {

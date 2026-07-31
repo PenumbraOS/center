@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import type { RefObject } from "react";
 
 interface SecretInputProps {
   value: string;
@@ -6,6 +7,8 @@ interface SecretInputProps {
   hasExisting: boolean;
   placeholder?: string;
   className?: string;
+  /** Render a multi-line textarea (e.g. for PEM `.p8` contents). */
+  multiline?: boolean;
 }
 
 const MASK =
@@ -17,9 +20,10 @@ export default function SecretInput({
   hasExisting,
   placeholder = "Enter API key",
   className,
+  multiline = false,
 }: SecretInputProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const handleReplace = useCallback(() => {
     onChange("");
@@ -62,14 +66,25 @@ export default function SecretInput({
   if (hasExisting && isEditing) {
     return (
       <div className={`app-secret-field ${className ?? ""}`.trim()}>
-        <input
-          ref={inputRef}
-          type="password"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="app-form-input"
-        />
+        {multiline ? (
+          <textarea
+            ref={inputRef as RefObject<HTMLTextAreaElement>}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="app-form-input"
+            rows={6}
+          />
+        ) : (
+          <input
+            ref={inputRef as RefObject<HTMLInputElement>}
+            type="password"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="app-form-input"
+          />
+        )}
         <button
           type="button"
           onClick={handleCancel}
@@ -83,13 +98,23 @@ export default function SecretInput({
 
   return (
     <div className={className}>
-      <input
-        type="password"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="app-form-input"
-      />
+      {multiline ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="app-form-input"
+          rows={6}
+        />
+      ) : (
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="app-form-input"
+        />
+      )}
     </div>
   );
 }

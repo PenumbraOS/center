@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connecting Spotify…</title>
+  </head>
+  <body
+    style="font-family: system-ui, sans-serif; padding: 2rem; color: #ddd; background: #121212;"
+  >
+    Connecting Spotify… you can close this window.
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var payload = {
+            source: "spotify-oauth",
+            code: params.get("code"),
+            state: params.get("state"),
+            error: params.get("error"),
+          };
+          if (window.opener) {
+            window.opener.postMessage(payload, window.location.origin);
+          }
+        } catch (e) {
+          /* no-op */
+        }
+        setTimeout(function () {
+          window.close();
+        }, 300);
+      })();
+    </script>
+  </body>
+</html>
