@@ -105,6 +105,19 @@ const APPLE_STOREFRONTS = [
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+/** Marks a control that persists to the Pin the moment it is used (the sign-in
+ * flows), so users don't expect to press Save for it like the fields around it. */
+function AutoSaveNote() {
+  return (
+    <span
+      className="app-auto-save-note"
+      title="This signs in and saves to your Pin immediately — no Save needed"
+    >
+      Applies immediately
+    </span>
+  );
+}
+
 function displayVersionValue(value: string | null | undefined) {
   return value && value.trim() ? value : "Unavailable";
 }
@@ -1089,6 +1102,7 @@ export default function SettingsPage() {
                         {settings.music?.apple_user_configured
                           ? " (signed in)"
                           : ""}
+                        <AutoSaveNote />
                         <InfoTooltip label="About Apple Music sign-in">
                           Signs in with your personal Apple ID (an active Apple
                           Music subscription is required) so the Pin can play and
@@ -1251,6 +1265,7 @@ export default function SettingsPage() {
                         {settings.music?.spotify_user_configured
                           ? " (connected)"
                           : ""}
+                        <AutoSaveNote />
                         <InfoTooltip label="About connecting your Spotify account">
                           Signs in with your Spotify account so the Pin can read
                           your saved songs and playlists (works on free or
@@ -1359,6 +1374,7 @@ export default function SettingsPage() {
                         {settings.music?.tidal_user_configured
                           ? " (signed in)"
                           : ""}
+                        <AutoSaveNote />
                       </span>
                       <button
                         type="button"

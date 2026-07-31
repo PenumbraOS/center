@@ -2659,6 +2659,21 @@ button.app-button--ghost {
   flex-shrink: 0;
 }
 
+/* Marks a sign-in control that persists to the Pin immediately, distinct from
+ * the manual-Save fields around it. */
+.app-auto-save-note {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: var(--color-success);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 /* Flags a section heading whose card holds unsaved edits. */
 .app-section-dirty {
   margin-left: 0.6rem;
