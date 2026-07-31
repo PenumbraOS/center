@@ -24,7 +24,6 @@ const LLM_PROVIDERS = [
 const MUSIC_PROVIDERS = [
   { value: "apple", label: "Apple Music" },
   { value: "spotify", label: "Spotify" },
-  { value: "youtube", label: "YouTube Music" },
   { value: "mopidy", label: "Mopidy (self-hosted)" },
 ] as const;
 
@@ -1091,15 +1090,6 @@ export default function SettingsPage() {
                       )}
                     </div>
                   </>
-                )}
-
-                {musicProvider === "youtube" && (
-                  <p className="home-card-desc">
-                    YouTube Music search and streaming run server-side and
-                    require the server built with the{" "}
-                    <code>youtube-playback</code> feature. No account login is
-                    needed.
-                  </p>
                 )}
 
                 {musicProvider === "mopidy" && (

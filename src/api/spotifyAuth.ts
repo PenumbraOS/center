@@ -19,9 +19,12 @@ export interface SpotifyAuthResult {
   redirectUri: string;
 }
 
-/** The redirect URI the user must register in their Spotify app settings. */
+/** The redirect URI the user must register in their Spotify app settings.
+ * Respects Vite's base path so it's correct whether Center is served at the root
+ * (local dev, base "/") or under a subpath (the hosted "center" build uses base
+ * "/center/"). `BASE_URL` always ends in a slash. */
 export function spotifyRedirectUri(): string {
-  return `${window.location.origin}/spotify-callback.html`;
+  return `${window.location.origin}${import.meta.env.BASE_URL}spotify-callback.html`;
 }
 
 function randomString(length: number): string {
