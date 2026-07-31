@@ -28,6 +28,29 @@ const MUSIC_PROVIDERS = [
   { value: "mopidy", label: "Mopidy (self-hosted)" },
 ] as const;
 
+/** A settings card that owns its own Save button, dirty state, and save status.
+ * Each maps to one or more `UpdateSettingsRequest` groups (see the per-section
+ * request builders). Saving one section leaves the others' unsaved edits. */
+type SettingsSection = "server" | "llm" | "music" | "services" | "developer";
+
+/** Every section, in page order — merged for the page-level Save. */
+const SETTINGS_SECTIONS: SettingsSection[] = [
+  "server",
+  "llm",
+  "music",
+  "services",
+  "developer",
+];
+
+/** Human labels for the unsaved-changes summary bar. */
+const SECTION_LABELS: Record<SettingsSection, string> = {
+  server: "Server",
+  llm: "LLM",
+  music: "Music",
+  services: "Services",
+  developer: "Developer",
+};
+
 /** Apple Music storefronts (ISO country code → display name). Common markets;
  * a text override is still allowed for any other valid storefront. */
 const APPLE_STOREFRONTS = [
@@ -173,8 +196,14 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, tidalClientId, tidalClientSecret]);
 
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // Which save is in flight (or just finished) and its status. Keyed by
+  // section, plus "all" for the page-level Save, so each button shows only its
+  // own status rather than sharing one global spinner.
+  const [activeSave, setActiveSave] = useState<{
+    key: SettingsSection | "all";
+    status: SaveStatus;
+    error: string | null;
+  } | null>(null);
   const [logDownloadError, setLogDownloadError] = useState<string | null>(null);
   const [downloadingLogKind, setDownloadingLogKind] = useState<
     "server" | "logcat" | null
@@ -275,19 +304,29 @@ export default function SettingsPage() {
     [appleKeyId],
   );
 
-  const populateForm = useCallback((s: Settings) => {
+  // Per-section form population (also used to reset a single section from the
+  // saved settings, so saving/resetting one section leaves the others' edits).
+  const resetLlmForm = useCallback((s: Settings) => {
     setProvider(s.llm.provider);
     setModel(s.llm.model);
     setApiKey("");
     setBaseUrl(s.llm.base_url ?? "");
     setGeminiGoogleSearch(s.llm.gemini_google_search ?? false);
+  }, []);
+  const resetServerForm = useCallback((s: Settings) => {
     setDisplayName(s.server.display_name ?? "");
     setSystemPrompt(s.server.system_prompt);
     setStatusPrompt(s.server.status_prompt ?? "");
+  }, []);
+  const resetServicesForm = useCallback((s: Settings) => {
     setWeatherKey("");
     setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
     setAllowAllInbound(s.contacts?.allow_all_inbound ?? false);
+  }, []);
+  const resetDeveloperForm = useCallback((s: Settings) => {
     setApkInstallEnabled(s.dev?.apk_install_enabled ?? false);
+  }, []);
+  const resetMusicForm = useCallback((s: Settings) => {
     setMusicProvider(s.music?.provider ?? "apple");
     setAppleToken("");
     setAppleP8("");
@@ -304,6 +343,41 @@ export default function SettingsPage() {
     setTidalClientId("");
     setTidalClientSecret("");
   }, []);
+  const populateForm = useCallback(
+    (s: Settings) => {
+      resetLlmForm(s);
+      resetServerForm(s);
+      resetMusicForm(s);
+      resetServicesForm(s);
+      resetDeveloperForm(s);
+    },
+    [
+      resetLlmForm,
+      resetServerForm,
+      resetMusicForm,
+      resetServicesForm,
+      resetDeveloperForm,
+    ],
+  );
+
+  const resetSectionForm = useCallback(
+    (section: SettingsSection, s: Settings) => {
+      ({
+        server: resetServerForm,
+        llm: resetLlmForm,
+        music: resetMusicForm,
+        services: resetServicesForm,
+        developer: resetDeveloperForm,
+      })[section](s);
+    },
+    [
+      resetLlmForm,
+      resetServerForm,
+      resetMusicForm,
+      resetServicesForm,
+      resetDeveloperForm,
+    ],
+  );
 
   function handleProviderChange(next: string) {
     setProvider(next);
@@ -354,163 +428,151 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, [client, populateForm]);
 
-  function buildRequest(): UpdateSettingsRequest | null {
+  // Each section builds its own request holding only its changed fields (or
+  // null when clean). `buildRequest` merges them for the page-level Save; a
+  // section's Save uses just its own builder so it persists only that group.
+  function buildLlmRequest(): UpdateSettingsRequest | null {
     if (!settings) return null;
-
-    const req: UpdateSettingsRequest = {};
-    let hasChanges = false;
-
-    const llm: UpdateSettingsRequest["llm"] = {};
-    if (provider !== settings.llm.provider) {
-      llm.provider = provider;
-      hasChanges = true;
-    }
-    if (model !== settings.llm.model) {
-      llm.model = model;
-      hasChanges = true;
-    }
-    if (apiKey !== "") {
-      llm.api_key = apiKey;
-      hasChanges = true;
-    }
-    if (baseUrl !== (settings.llm.base_url ?? "")) {
-      llm.base_url = baseUrl;
-      hasChanges = true;
-    }
+    const llm: NonNullable<UpdateSettingsRequest["llm"]> = {};
+    if (provider !== settings.llm.provider) llm.provider = provider;
+    if (model !== settings.llm.model) llm.model = model;
+    if (apiKey !== "") llm.api_key = apiKey;
+    if (baseUrl !== (settings.llm.base_url ?? "")) llm.base_url = baseUrl;
     if (geminiGoogleSearch !== (settings.llm.gemini_google_search ?? false)) {
       llm.gemini_google_search = geminiGoogleSearch;
-      hasChanges = true;
     }
-    if (Object.keys(llm).length > 0) req.llm = llm;
+    return Object.keys(llm).length > 0 ? { llm } : null;
+  }
 
-    const server: UpdateSettingsRequest["server"] = {};
+  function buildServerRequest(): UpdateSettingsRequest | null {
+    if (!settings) return null;
+    const server: NonNullable<UpdateSettingsRequest["server"]> = {};
     if (displayName !== (settings.server.display_name ?? "")) {
       server.display_name = displayName;
-      hasChanges = true;
     }
     if (systemPrompt !== settings.server.system_prompt) {
       server.system_prompt = systemPrompt;
-      hasChanges = true;
     }
     if (statusPrompt !== (settings.server.status_prompt ?? "")) {
       server.status_prompt = statusPrompt;
-      hasChanges = true;
     }
-    if (Object.keys(server).length > 0) req.server = server;
+    return Object.keys(server).length > 0 ? { server } : null;
+  }
 
-    if (weatherKey !== "") {
-      req.weather = { pirate_weather_api_key: weatherKey };
-      hasChanges = true;
-    }
-
+  function buildServicesRequest(): UpdateSettingsRequest | null {
+    if (!settings) return null;
+    const req: UpdateSettingsRequest = {};
+    if (weatherKey !== "") req.weather = { pirate_weather_api_key: weatherKey };
+    const contacts: NonNullable<UpdateSettingsRequest["contacts"]> = {};
     if (trustAllContacts !== (settings.contacts?.trust_all_contacts ?? false)) {
-      req.contacts = { ...req.contacts, trust_all_contacts: trustAllContacts };
-      hasChanges = true;
+      contacts.trust_all_contacts = trustAllContacts;
     }
     if (allowAllInbound !== (settings.contacts?.allow_all_inbound ?? false)) {
-      req.contacts = { ...req.contacts, allow_all_inbound: allowAllInbound };
-      hasChanges = true;
+      contacts.allow_all_inbound = allowAllInbound;
     }
+    if (Object.keys(contacts).length > 0) req.contacts = contacts;
+    return Object.keys(req).length > 0 ? req : null;
+  }
 
+  function buildDeveloperRequest(): UpdateSettingsRequest | null {
+    if (!settings) return null;
     if (apkInstallEnabled !== (settings.dev?.apk_install_enabled ?? false)) {
-      req.dev = { apk_install_enabled: apkInstallEnabled };
-      hasChanges = true;
+      return { dev: { apk_install_enabled: apkInstallEnabled } };
     }
+    return null;
+  }
 
-    const music: UpdateSettingsRequest["music"] = {};
+  function buildMusicRequest(): UpdateSettingsRequest | null {
+    if (!settings) return null;
+    const music: NonNullable<UpdateSettingsRequest["music"]> = {};
     if (musicProvider !== (settings.music?.provider ?? "apple")) {
       music.provider = musicProvider;
-      hasChanges = true;
     }
-    if (appleToken !== "") {
-      music.apple_developer_token = appleToken;
-      hasChanges = true;
-    }
-    if (appleP8 !== "") {
-      music.apple_p8_private_key = appleP8;
-      hasChanges = true;
-    }
-    if (appleKeyId !== "") {
-      music.apple_key_id = appleKeyId;
-      hasChanges = true;
-    }
-    if (appleTeamId !== "") {
-      music.apple_team_id = appleTeamId;
-      hasChanges = true;
-    }
+    if (appleToken !== "") music.apple_developer_token = appleToken;
+    if (appleP8 !== "") music.apple_p8_private_key = appleP8;
+    if (appleKeyId !== "") music.apple_key_id = appleKeyId;
+    if (appleTeamId !== "") music.apple_team_id = appleTeamId;
     if (appleStorefront !== (settings.music?.apple_storefront ?? "us")) {
       music.apple_storefront = appleStorefront;
-      hasChanges = true;
     }
-    if (spotifyClientId !== "") {
-      music.spotify_client_id = spotifyClientId;
-      hasChanges = true;
-    }
+    if (spotifyClientId !== "") music.spotify_client_id = spotifyClientId;
     if (spotifyClientSecret !== "") {
       music.spotify_client_secret = spotifyClientSecret;
-      hasChanges = true;
     }
-    if (spotifyUsername !== "") {
-      music.spotify_username = spotifyUsername;
-      hasChanges = true;
-    }
-    if (spotifyPassword !== "") {
-      music.spotify_password = spotifyPassword;
-      hasChanges = true;
-    }
+    if (spotifyUsername !== "") music.spotify_username = spotifyUsername;
+    if (spotifyPassword !== "") music.spotify_password = spotifyPassword;
     if (mopidyUrl !== (settings.music?.mopidy_url ?? "")) {
       music.mopidy_url = mopidyUrl;
-      hasChanges = true;
     }
     if (mopidyStreamUrl !== (settings.music?.mopidy_stream_url ?? "")) {
       music.mopidy_stream_url = mopidyStreamUrl;
-      hasChanges = true;
     }
-    if (tidalClientId !== "") {
-      music.tidal_client_id = tidalClientId;
-      hasChanges = true;
-    }
-    if (tidalClientSecret !== "") {
-      music.tidal_client_secret = tidalClientSecret;
-      hasChanges = true;
-    }
-    if (Object.keys(music).length > 0) req.music = music;
-
-    return hasChanges ? req : null;
+    if (tidalClientId !== "") music.tidal_client_id = tidalClientId;
+    if (tidalClientSecret !== "") music.tidal_client_secret = tidalClientSecret;
+    return Object.keys(music).length > 0 ? { music } : null;
   }
 
-  async function handleSave() {
+  function buildSectionRequest(
+    section: SettingsSection,
+  ): UpdateSettingsRequest | null {
+    switch (section) {
+      case "server":
+        return buildServerRequest();
+      case "llm":
+        return buildLlmRequest();
+      case "music":
+        return buildMusicRequest();
+      case "services":
+        return buildServicesRequest();
+      case "developer":
+        return buildDeveloperRequest();
+    }
+  }
+
+  function buildRequest(): UpdateSettingsRequest | null {
+    const merged: UpdateSettingsRequest = {};
+    for (const section of SETTINGS_SECTIONS) {
+      Object.assign(merged, buildSectionRequest(section));
+    }
+    return Object.keys(merged).length > 0 ? merged : null;
+  }
+
+  async function handleSave(section: SettingsSection | "all" = "all") {
     if (!client) return;
-    const req = buildRequest();
+    const req =
+      section === "all" ? buildRequest() : buildSectionRequest(section);
     if (!req) return;
 
-    setSaveStatus("saving");
-    setSaveError(null);
+    setActiveSave({ key: section, status: "saving", error: null });
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
     logInfo("settings-page", "Saving settings", {
       baseUrl: client.baseUrl,
+      section,
       request: req,
     });
 
     try {
       const updated = await client.updateSettings(req);
       setSettings(updated);
-      populateForm(updated);
-      setSaveStatus("saved");
-      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+      // Reset only the saved section(s) so unsaved edits elsewhere survive.
+      if (section === "all") populateForm(updated);
+      else resetSectionForm(section, updated);
+      setActiveSave({ key: section, status: "saved", error: null });
+      saveTimerRef.current = setTimeout(() => setActiveSave(null), 3000);
       logInfo("settings-page", "Settings saved", {
         baseUrl: client.baseUrl,
+        section,
       });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to save settings";
       logError("settings-page", "Failed to save settings", err, {
         baseUrl: client.baseUrl,
+        section,
         request: req,
       });
-      setSaveError(message);
-      setSaveStatus("error");
+      setActiveSave({ key: section, status: "error", error: message });
     }
   }
 
@@ -572,6 +634,79 @@ export default function SettingsPage() {
   }
 
   const isDirty = buildRequest() !== null;
+  const dirtySections = SETTINGS_SECTIONS.filter(
+    (section) => buildSectionRequest(section) !== null,
+  );
+
+  const saveStatusFor = (key: SettingsSection | "all"): SaveStatus =>
+    activeSave?.key === key ? activeSave.status : "idle";
+  const saveErrorFor = (key: SettingsSection | "all"): string | null =>
+    activeSave?.key === key ? activeSave.error : null;
+
+  const pageSaveStatus = saveStatusFor("all");
+  const pageSaveError = saveErrorFor("all");
+
+  /** Revert a section (or the whole page) back to the last-saved settings,
+   * discarding its unsaved edits. Also clears any stale save status for it. */
+  const handleReset = (section: SettingsSection | "all") => {
+    if (!settings) return;
+    if (section === "all") populateForm(settings);
+    else resetSectionForm(section, settings);
+    setActiveSave((current) => (current?.key === section ? null : current));
+  };
+
+  /** A badge on a section heading flagging that it holds unsaved edits, so a
+   * user scanning the page can see at a glance which cards still need a Save. */
+  const renderSectionHeading = (title: string, section: SettingsSection) => (
+    <h2>
+      {title}
+      {buildSectionRequest(section) !== null && (
+        <span
+          className="app-section-dirty"
+          title="This section has unsaved changes"
+        >
+          Unsaved
+        </span>
+      )}
+    </h2>
+  );
+
+  /** A per-section Save so users can save from where they're editing instead of
+   * scrolling to the page-level button. It persists only this section's changed
+   * fields and shows its own status, independent of the other sections. */
+  const renderSectionSave = (section: SettingsSection) => {
+    const dirty = buildSectionRequest(section) !== null;
+    const status = saveStatusFor(section);
+    return (
+      <div className="app-section-save">
+        <button
+          type="button"
+          onClick={() => handleSave(section)}
+          disabled={!dirty || status === "saving"}
+          className="app-button app-button--save"
+        >
+          {status === "saving" ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleReset(section)}
+          disabled={!dirty || status === "saving"}
+          className="app-button app-button--ghost app-button--small"
+        >
+          Discard changes
+        </button>
+        {status === "saved" && (
+          <span className="app-save-status app-save-status--saved">Saved</span>
+        )}
+        {status === "error" && (
+          <span className="app-save-status app-save-status--error">
+            {saveErrorFor(section)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const showBaseUrl = provider === "openai-compatible" || baseUrl !== "";
   const showModelAndKey = provider !== "echo";
   const showGeminiGoogleSearch = provider === "gemini";
@@ -593,28 +728,36 @@ export default function SettingsPage() {
         <div className="container app-flow app-settings-width">
           <div className="app-button-row app-button-row--flex-end">
             <div className="app-inline-actions">
-              {saveStatus === "saving" && (
+              {pageSaveStatus === "saving" && (
                 <span className="app-save-status app-save-status--saving">
                   Saving…
                 </span>
               )}
-              {saveStatus === "saved" && (
+              {pageSaveStatus === "saved" && (
                 <span className="app-save-status app-save-status--saved">
                   Saved
                 </span>
               )}
-              {saveStatus === "error" && (
+              {pageSaveStatus === "error" && (
                 <span className="app-save-status app-save-status--error">
-                  {saveError}
+                  {pageSaveError}
                 </span>
               )}
             </div>
             <button
-              onClick={handleSave}
-              disabled={!isDirty || saveStatus === "saving"}
+              type="button"
+              onClick={() => handleReset("all")}
+              disabled={!isDirty || pageSaveStatus === "saving"}
+              className="app-button app-button--ghost"
+            >
+              Discard all
+            </button>
+            <button
+              onClick={() => handleSave("all")}
+              disabled={!isDirty || pageSaveStatus === "saving"}
               className="hero-cta app-button"
             >
-              {saveStatus === "saving" ? "Saving..." : "Save Changes"}
+              {pageSaveStatus === "saving" ? "Saving..." : "Save Changes"}
             </button>
           </div>
 
@@ -629,7 +772,7 @@ export default function SettingsPage() {
           {settings && (
             <div className="app-flow">
               <section className="app-form-card">
-                <h2>Server</h2>
+                {renderSectionHeading("Server", "server")}
 
                 <label className="app-form-field">
                   <span className="app-form-label">Display Name</span>
@@ -691,10 +834,11 @@ export default function SettingsPage() {
                     System Prompt.
                   </span>
                 </label>
+                {renderSectionSave("server")}
               </section>
 
               <section className="app-form-card">
-                <h2>LLM</h2>
+                {renderSectionHeading("LLM", "llm")}
 
                 <label className="app-form-field">
                   <span className="app-form-label">Provider</span>
@@ -769,10 +913,11 @@ export default function SettingsPage() {
                     />
                   </label>
                 )}
+                {renderSectionSave("llm")}
               </section>
 
               <section className="app-form-card">
-                <h2>Music</h2>
+                {renderSectionHeading("Music", "music")}
 
                 <label className="app-form-field">
                   <span className="app-form-label">Provider</span>
@@ -1317,10 +1462,11 @@ export default function SettingsPage() {
                     </span>
                   </>
                 )}
+                {renderSectionSave("music")}
               </section>
 
               <section className="app-form-card">
-                <h2>Services</h2>
+                {renderSectionHeading("Services", "services")}
 
                 <div className="app-form-field">
                   <span className="app-form-label">PirateWeather API Key</span>
@@ -1383,6 +1529,7 @@ export default function SettingsPage() {
                     Manage eSIM
                   </button>
                 </div>
+                {renderSectionSave("services")}
               </section>
 
               <section className="app-form-card app-flow--sm">
@@ -1423,7 +1570,7 @@ export default function SettingsPage() {
               </section>
 
               <section className="app-form-card">
-                <h2>Developer</h2>
+                {renderSectionHeading("Developer", "developer")}
 
                 <div className="app-form-field">
                   <span className="app-form-label">Remote APK Install</span>
@@ -1439,6 +1586,7 @@ export default function SettingsPage() {
                     />
                   </label>
                 </div>
+                {renderSectionSave("developer")}
               </section>
 
               <section className="app-form-card app-flow--sm">
@@ -1494,6 +1642,34 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </section>
+            </div>
+          )}
+
+          {dirtySections.length > 0 && (
+            <div className="app-unsaved-bar" role="status">
+              <span className="app-unsaved-bar-text">
+                {dirtySections.length} unsaved{" "}
+                {dirtySections.length === 1 ? "section" : "sections"}:{" "}
+                {dirtySections.map((section) => SECTION_LABELS[section]).join(", ")}
+              </span>
+              <div className="app-unsaved-bar-actions">
+                <button
+                  type="button"
+                  onClick={() => handleReset("all")}
+                  disabled={pageSaveStatus === "saving"}
+                  className="app-button app-button--ghost app-button--small"
+                >
+                  Discard all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSave("all")}
+                  disabled={pageSaveStatus === "saving"}
+                  className="app-button app-button--save"
+                >
+                  {pageSaveStatus === "saving" ? "Saving…" : "Save all"}
+                </button>
+              </div>
             </div>
           )}
         </div>
