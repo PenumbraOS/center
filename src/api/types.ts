@@ -120,6 +120,31 @@ export interface Settings {
   dev?: {
     apk_install_enabled?: boolean;
   };
+  music?: {
+    provider: string;
+    apple_configured: boolean;
+    /** The .p8 + Key ID + Team ID are all present (server self-mints tokens). */
+    apple_key_configured: boolean;
+    /** A Music User Token is stored (personalized library/mixes/favorites work). */
+    apple_user_configured: boolean;
+    apple_storefront: string;
+    spotify_configured: boolean;
+    spotify_playback_ready: boolean;
+    /** A Spotify user is signed in via OAuth (real library/favorites available). */
+    spotify_user_configured: boolean;
+    /** Public Spotify Client ID, for building the OAuth authorize URL. */
+    spotify_client_id: string | null;
+    spotify_market: string;
+    /** Mopidy server URL + Icecast stream URL (bring-your-own-providers). */
+    mopidy_url: string | null;
+    mopidy_stream_url: string | null;
+  };
+}
+
+/** MusicKit-JS config for the "Sign in with Apple Music" flow. */
+export interface MusicKitConfig {
+  developer_token: string | null;
+  storefront: string;
 }
 
 /** Partial update request — only include fields you want to change. */
@@ -145,6 +170,23 @@ export interface UpdateSettingsRequest {
   };
   dev?: {
     apk_install_enabled?: boolean;
+  };
+  music?: {
+    provider?: string;
+    apple_developer_token?: string;
+    /** Music User Token captured by MusicKit-JS sign-in. */
+    apple_user_token?: string;
+    /** MusicKit .p8 private key contents; the server mints tokens from it. */
+    apple_p8_private_key?: string;
+    apple_key_id?: string;
+    apple_team_id?: string;
+    apple_storefront?: string;
+    spotify_client_id?: string;
+    spotify_client_secret?: string;
+    spotify_username?: string;
+    spotify_password?: string;
+    mopidy_url?: string;
+    mopidy_stream_url?: string;
   };
 }
 

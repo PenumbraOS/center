@@ -6,6 +6,7 @@ export { discoverServers, DEFAULT_PIN_PORT } from "./discovery";
 export type { DiscoveredServer } from "./discovery";
 export type {
   MemoryRecord,
+  MusicKitConfig,
   Location,
   CellularDataConnectionState,
   CellularServiceDetails,

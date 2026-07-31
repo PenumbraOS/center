@@ -7,7 +7,10 @@ import {
   type PackageStatusRowViewModel,
 } from "../components/PackageStatusList";
 import SecretInput from "../components/SecretInput";
+import InfoTooltip from "../components/InfoTooltip";
 import UnsavedChangesPrompt from "../components/UnsavedChangesPrompt";
+import { authorizeAppleMusic } from "../api/appleMusicKit";
+import { authorizeSpotify, spotifyRedirectUri } from "../api/spotifyAuth";
 import { logError, logInfo } from "../logging";
 
 const LLM_PROVIDERS = [
@@ -16,6 +19,65 @@ const LLM_PROVIDERS = [
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI" },
   { value: "openai-compatible", label: "OpenAI-compatible" },
+] as const;
+
+const MUSIC_PROVIDERS = [
+  { value: "apple", label: "Apple Music" },
+  { value: "spotify", label: "Spotify" },
+  { value: "youtube", label: "YouTube Music" },
+  { value: "mopidy", label: "Mopidy (self-hosted)" },
+] as const;
+
+/** Apple Music storefronts (ISO country code → display name). Common markets;
+ * a text override is still allowed for any other valid storefront. */
+const APPLE_STOREFRONTS = [
+  ["us", "United States"],
+  ["gb", "United Kingdom"],
+  ["ca", "Canada"],
+  ["au", "Australia"],
+  ["nz", "New Zealand"],
+  ["ie", "Ireland"],
+  ["de", "Germany"],
+  ["fr", "France"],
+  ["es", "Spain"],
+  ["it", "Italy"],
+  ["nl", "Netherlands"],
+  ["be", "Belgium"],
+  ["ch", "Switzerland"],
+  ["at", "Austria"],
+  ["se", "Sweden"],
+  ["no", "Norway"],
+  ["dk", "Denmark"],
+  ["fi", "Finland"],
+  ["pt", "Portugal"],
+  ["pl", "Poland"],
+  ["cz", "Czechia"],
+  ["gr", "Greece"],
+  ["ru", "Russia"],
+  ["tr", "Turkey"],
+  ["jp", "Japan"],
+  ["kr", "South Korea"],
+  ["cn", "China mainland"],
+  ["hk", "Hong Kong"],
+  ["tw", "Taiwan"],
+  ["sg", "Singapore"],
+  ["my", "Malaysia"],
+  ["th", "Thailand"],
+  ["id", "Indonesia"],
+  ["ph", "Philippines"],
+  ["vn", "Vietnam"],
+  ["in", "India"],
+  ["ae", "United Arab Emirates"],
+  ["sa", "Saudi Arabia"],
+  ["il", "Israel"],
+  ["za", "South Africa"],
+  ["ng", "Nigeria"],
+  ["eg", "Egypt"],
+  ["mx", "Mexico"],
+  ["br", "Brazil"],
+  ["ar", "Argentina"],
+  ["cl", "Chile"],
+  ["co", "Colombia"],
 ] as const;
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -43,6 +105,19 @@ export default function SettingsPage() {
   const [trustAllContacts, setTrustAllContacts] = useState(false);
   const [allowAllInbound, setAllowAllInbound] = useState(false);
   const [apkInstallEnabled, setApkInstallEnabled] = useState(false);
+  const [musicProvider, setMusicProvider] = useState("apple");
+  const [appleToken, setAppleToken] = useState("");
+  const [appleP8, setAppleP8] = useState("");
+  const [appleP8FileName, setAppleP8FileName] = useState<string | null>(null);
+  const [appleKeyId, setAppleKeyId] = useState("");
+  const [appleTeamId, setAppleTeamId] = useState("");
+  const [appleStorefront, setAppleStorefront] = useState("us");
+  const [spotifyClientId, setSpotifyClientId] = useState("");
+  const [spotifyClientSecret, setSpotifyClientSecret] = useState("");
+  const [spotifyUsername, setSpotifyUsername] = useState("");
+  const [spotifyPassword, setSpotifyPassword] = useState("");
+  const [mopidyUrl, setMopidyUrl] = useState("");
+  const [mopidyStreamUrl, setMopidyStreamUrl] = useState("");
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -53,6 +128,98 @@ export default function SettingsPage() {
   const [allowDisconnectNavigation, setAllowDisconnectNavigation] =
     useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [appleSignIn, setAppleSignIn] = useState<
+    "idle" | "signing" | "done" | "error"
+  >("idle");
+  const [appleSignInError, setAppleSignInError] = useState<string | null>(null);
+  const [spotifyConnect, setSpotifyConnect] = useState<
+    "idle" | "connecting" | "done" | "error"
+  >("idle");
+  const [spotifyConnectError, setSpotifyConnectError] = useState<string | null>(
+    null,
+  );
+
+  /** Run the Spotify OAuth (PKCE) popup, then hand the code to the Pin to
+   * exchange + store the refresh token. */
+  const handleSpotifyConnect = useCallback(async () => {
+    if (!client) return;
+    setSpotifyConnect("connecting");
+    setSpotifyConnectError(null);
+    try {
+      const clientId =
+        spotifyClientId.trim() || settings?.music?.spotify_client_id || "";
+      if (!clientId) {
+        throw new Error("Enter and save your Spotify Client ID first.");
+      }
+      const { code, codeVerifier, redirectUri } =
+        await authorizeSpotify(clientId);
+      await client.exchangeSpotifyCode({
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: redirectUri,
+      });
+      const updated = await client.getSettings();
+      setSettings(updated);
+      populateForm(updated);
+      setSpotifyConnect("done");
+    } catch (error) {
+      logError("settings-page", "Spotify connect failed", error);
+      setSpotifyConnectError(
+        error instanceof Error ? error.message : String(error),
+      );
+      setSpotifyConnect("error");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, spotifyClientId, settings]);
+
+  /** Run the MusicKit-JS Apple Music sign-in, then persist the captured Music
+   * User Token to the Pin. Uses the Pin's configured developer token, or the
+   * value the user just typed into the developer-token field. */
+  const handleAppleSignIn = useCallback(async () => {
+    if (!client) return;
+    setAppleSignIn("signing");
+    setAppleSignInError(null);
+    try {
+      let developerToken = appleToken.trim();
+      if (!developerToken) {
+        const cfg = await client.getMusicKitConfig();
+        developerToken = cfg.developer_token ?? "";
+      }
+      if (!developerToken) {
+        throw new Error(
+          "Enter and save an Apple developer token first, then sign in.",
+        );
+      }
+      const userToken = await authorizeAppleMusic(developerToken);
+      const updated = await client.updateSettings({
+        music: { apple_user_token: userToken },
+      });
+      setSettings(updated);
+      populateForm(updated);
+      setAppleSignIn("done");
+    } catch (error) {
+      logError("settings-page", "Apple Music sign-in failed", error);
+      setAppleSignInError(
+        error instanceof Error ? error.message : String(error),
+      );
+      setAppleSignIn("error");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, appleToken]);
+
+  /** Read an uploaded MusicKit `.p8` into the key field. Apple names the file
+   * `AuthKey_<KEYID>.p8`, so pre-fill the Key ID from the filename too. */
+  const handleP8Upload = useCallback(
+    async (file: File | undefined) => {
+      if (!file) return;
+      const text = await file.text();
+      setAppleP8(text);
+      setAppleP8FileName(file.name);
+      const match = file.name.match(/AuthKey_([A-Z0-9]+)\.p8/i);
+      if (match && appleKeyId === "") setAppleKeyId(match[1]);
+    },
+    [appleKeyId],
+  );
 
   const populateForm = useCallback((s: Settings) => {
     setProvider(s.llm.provider);
@@ -67,6 +234,19 @@ export default function SettingsPage() {
     setTrustAllContacts(s.contacts?.trust_all_contacts ?? false);
     setAllowAllInbound(s.contacts?.allow_all_inbound ?? false);
     setApkInstallEnabled(s.dev?.apk_install_enabled ?? false);
+    setMusicProvider(s.music?.provider ?? "apple");
+    setAppleToken("");
+    setAppleP8("");
+    setAppleP8FileName(null);
+    setAppleKeyId("");
+    setAppleTeamId("");
+    setAppleStorefront(s.music?.apple_storefront ?? "us");
+    setSpotifyClientId("");
+    setSpotifyClientSecret("");
+    setSpotifyUsername("");
+    setSpotifyPassword("");
+    setMopidyUrl(s.music?.mopidy_url ?? "");
+    setMopidyStreamUrl(s.music?.mopidy_stream_url ?? "");
   }, []);
 
   function handleProviderChange(next: string) {
@@ -180,6 +360,57 @@ export default function SettingsPage() {
       req.dev = { apk_install_enabled: apkInstallEnabled };
       hasChanges = true;
     }
+
+    const music: UpdateSettingsRequest["music"] = {};
+    if (musicProvider !== (settings.music?.provider ?? "apple")) {
+      music.provider = musicProvider;
+      hasChanges = true;
+    }
+    if (appleToken !== "") {
+      music.apple_developer_token = appleToken;
+      hasChanges = true;
+    }
+    if (appleP8 !== "") {
+      music.apple_p8_private_key = appleP8;
+      hasChanges = true;
+    }
+    if (appleKeyId !== "") {
+      music.apple_key_id = appleKeyId;
+      hasChanges = true;
+    }
+    if (appleTeamId !== "") {
+      music.apple_team_id = appleTeamId;
+      hasChanges = true;
+    }
+    if (appleStorefront !== (settings.music?.apple_storefront ?? "us")) {
+      music.apple_storefront = appleStorefront;
+      hasChanges = true;
+    }
+    if (spotifyClientId !== "") {
+      music.spotify_client_id = spotifyClientId;
+      hasChanges = true;
+    }
+    if (spotifyClientSecret !== "") {
+      music.spotify_client_secret = spotifyClientSecret;
+      hasChanges = true;
+    }
+    if (spotifyUsername !== "") {
+      music.spotify_username = spotifyUsername;
+      hasChanges = true;
+    }
+    if (spotifyPassword !== "") {
+      music.spotify_password = spotifyPassword;
+      hasChanges = true;
+    }
+    if (mopidyUrl !== (settings.music?.mopidy_url ?? "")) {
+      music.mopidy_url = mopidyUrl;
+      hasChanges = true;
+    }
+    if (mopidyStreamUrl !== (settings.music?.mopidy_stream_url ?? "")) {
+      music.mopidy_stream_url = mopidyStreamUrl;
+      hasChanges = true;
+    }
+    if (Object.keys(music).length > 0) req.music = music;
 
     return hasChanges ? req : null;
   }
@@ -473,6 +704,464 @@ export default function SettingsPage() {
                       className="app-form-input"
                     />
                   </label>
+                )}
+              </section>
+
+              <section className="app-form-card">
+                <h2>Music</h2>
+
+                <label className="app-form-field">
+                  <span className="app-form-label">Provider</span>
+                  <select
+                    value={musicProvider}
+                    onChange={(e) => setMusicProvider(e.target.value)}
+                    className="app-form-select"
+                  >
+                    {MUSIC_PROVIDERS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="app-form-help">
+                    Changes apply immediately — no restart needed. Apple Music
+                    plays on-device; Spotify and YouTube stream from the server.
+                  </span>
+                </label>
+
+                {musicProvider === "apple" && (
+                  <>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        MusicKit Private Key (.p8)
+                        {settings.music?.apple_key_configured
+                          ? " (configured)"
+                          : ""}
+                        <InfoTooltip label="Where to get the MusicKit .p8 key">
+                          Apple Developer portal →{" "}
+                          <a
+                            href="https://developer.apple.com/account/resources/authkeys/list"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Certificates, IDs &amp; Profiles → Keys
+                          </a>
+                          . Create a key with <strong>MusicKit</strong> enabled
+                          and download the <code>AuthKey_XXXX.p8</code> file (you
+                          can only download it once). The Pin signs and
+                          auto-refreshes the developer token from it — this stays
+                          on your device.
+                        </InfoTooltip>
+                      </span>
+                      <div className="app-p8-upload">
+                        <label className="app-button app-button--file">
+                          Upload .p8 file
+                          <input
+                            type="file"
+                            accept=".p8,.pem,.txt"
+                            onChange={(e) =>
+                              handleP8Upload(e.target.files?.[0])
+                            }
+                            style={{ display: "none" }}
+                          />
+                        </label>
+                        {appleP8FileName && (
+                          <span className="app-form-help">
+                            Loaded <code>{appleP8FileName}</code> — save to apply.
+                          </span>
+                        )}
+                      </div>
+                      <details className="app-form-field">
+                        <summary className="app-form-label">
+                          Or paste the key contents
+                        </summary>
+                        <SecretInput
+                          value={appleP8}
+                          onChange={setAppleP8}
+                          hasExisting={
+                            settings.music?.apple_key_configured ?? false
+                          }
+                          multiline
+                        />
+                      </details>
+                    </div>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Key ID
+                        <InfoTooltip label="Where to find the Key ID">
+                          The 10-character ID of the MusicKit key, shown next to
+                          it in the Apple Developer portal's Keys list. It's also
+                          the <code>XXXX</code> in the{" "}
+                          <code>AuthKey_XXXX.p8</code> filename — uploading the
+                          file fills this in automatically.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={appleKeyId}
+                        onChange={(e) => setAppleKeyId(e.target.value)}
+                        placeholder="10-char key id (e.g. ABC123DEFG)"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Team ID
+                        <InfoTooltip label="Where to find the Team ID">
+                          Your 10-character Apple Developer Team ID, shown at the
+                          top-right of{" "}
+                          <a
+                            href="https://developer.apple.com/account"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            developer.apple.com/account
+                          </a>{" "}
+                          under Membership details.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={appleTeamId}
+                        onChange={(e) => setAppleTeamId(e.target.value)}
+                        placeholder="10-char Apple Team ID"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <details className="app-form-field">
+                      <summary className="app-form-label">
+                        Advanced: paste a developer token instead
+                      </summary>
+                      <SecretInput
+                        value={appleToken}
+                        onChange={setAppleToken}
+                        hasExisting={settings.music?.apple_configured ?? false}
+                      />
+                      <span className="app-form-help">
+                        A pre-signed MusicKit developer token (ES256 JWT). Only
+                        needed if you'd rather not provide the .p8 above; note it
+                        expires within 6 months and must be replaced manually.
+                      </span>
+                    </details>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Storefront
+                        <InfoTooltip label="What is the storefront">
+                          The two-letter country code of your Apple Music
+                          storefront (e.g. <code>us</code>, <code>gb</code>,{" "}
+                          <code>jp</code>) — it selects which catalog is searched.
+                          Use the country your Apple Music account is set to.
+                        </InfoTooltip>
+                      </span>
+                      <select
+                        value={appleStorefront}
+                        onChange={(e) => setAppleStorefront(e.target.value)}
+                        className="app-form-select"
+                      >
+                        {!APPLE_STOREFRONTS.some(
+                          ([code]) => code === appleStorefront,
+                        ) &&
+                          appleStorefront !== "" && (
+                            <option value={appleStorefront}>
+                              {appleStorefront.toUpperCase()}
+                            </option>
+                          )}
+                        {APPLE_STOREFRONTS.map(([code, name]) => (
+                          <option key={code} value={code}>
+                            {name} ({code.toUpperCase()})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        Apple Music Account
+                        {settings.music?.apple_user_configured
+                          ? " (signed in)"
+                          : ""}
+                        <InfoTooltip label="About Apple Music sign-in">
+                          Signs in with your personal Apple ID (an active Apple
+                          Music subscription is required) so the Pin can play and
+                          read your library, mixes, and favorites. Opens Apple's
+                          own sign-in popup; only the resulting account token is
+                          sent to your Pin. Save the key fields above first.
+                        </InfoTooltip>
+                      </span>
+                      <button
+                        type="button"
+                        className="app-apple-music-button"
+                        onClick={handleAppleSignIn}
+                        disabled={appleSignIn === "signing"}
+                      >
+                        <svg
+                          className="app-apple-music-logo"
+                          viewBox="0 0 24 24"
+                          width="18"
+                          height="18"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.635 0 2.94.06 4.485 2.16-.11.07-2.6 1.52-2.6 4.52 0 3.61 3.21 4.89 3.24 4.9z" />
+                        </svg>
+                        <span>
+                          {appleSignIn === "signing"
+                            ? "Signing in…"
+                            : settings.music?.apple_user_configured
+                              ? "Reconnect Apple Music"
+                              : "Sign in with Apple Music"}
+                        </span>
+                      </button>
+                      <span className="app-form-help">
+                        Signs in with your Apple ID to unlock your library,
+                        made-for-you mixes, and favorites. Opens an Apple popup;
+                        the account token is sent to the Pin. Requires the
+                        developer token above to be saved first.
+                      </span>
+                      {appleSignIn === "done" && (
+                        <span className="app-form-help" style={{ color: "var(--ok, #3fb950)" }}>
+                          Signed in — your Apple Music library is now available.
+                        </span>
+                      )}
+                      {appleSignIn === "error" && appleSignInError && (
+                        <span className="app-form-error">{appleSignInError}</span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {musicProvider === "spotify" && (
+                  <>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Client ID
+                        {settings.music?.spotify_configured
+                          ? " (configured)"
+                          : ""}
+                        <InfoTooltip label="Where to get the Spotify Client ID">
+                          Create a free app in the{" "}
+                          <a
+                            href="https://developer.spotify.com/dashboard"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Spotify Developer Dashboard
+                          </a>
+                          . Open the app → <strong>Settings</strong>; the{" "}
+                          <strong>Client ID</strong> is shown there. Any redirect
+                          URI works (it's unused here).
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={spotifyClientId}
+                        onChange={(e) => setSpotifyClientId(e.target.value)}
+                        placeholder="Spotify app client id"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        Client Secret
+                        <InfoTooltip label="Where to get the Spotify Client Secret">
+                          Same app in the{" "}
+                          <a
+                            href="https://developer.spotify.com/dashboard"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Developer Dashboard
+                          </a>{" "}
+                          → Settings → <strong>View client secret</strong>. It
+                          pairs with the Client ID to enable search and metadata.
+                        </InfoTooltip>
+                      </span>
+                      <SecretInput
+                        value={spotifyClientSecret}
+                        onChange={setSpotifyClientSecret}
+                        hasExisting={settings.music?.spotify_configured ?? false}
+                      />
+                      <span className="app-form-help">
+                        App credentials enable search &amp; metadata. Playback
+                        additionally needs a Premium account below and the
+                        server built with the <code>spotify-playback</code>{" "}
+                        feature.
+                      </span>
+                    </div>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Premium Username
+                        {settings.music?.spotify_playback_ready
+                          ? " (configured)"
+                          : ""}
+                        <InfoTooltip label="About the Spotify Premium login">
+                          Your own Spotify account login, used to stream audio
+                          (via librespot). A <strong>Premium</strong>{" "}
+                          subscription is required — Spotify blocks on-demand
+                          playback for free accounts. Find or set a username in
+                          your{" "}
+                          <a
+                            href="https://www.spotify.com/account/"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Spotify account
+                          </a>
+                          . Stays on your device.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={spotifyUsername}
+                        onChange={(e) => setSpotifyUsername(e.target.value)}
+                        placeholder="Spotify Premium username"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        Premium Password
+                        <InfoTooltip label="About the Spotify Premium password">
+                          The password for the Spotify Premium account above.
+                          Sent only to your Pin and stored in its local config.
+                          If you sign in to Spotify with Google/Facebook/Apple,
+                          set a Spotify password in your account settings first.
+                        </InfoTooltip>
+                      </span>
+                      <SecretInput
+                        value={spotifyPassword}
+                        onChange={setSpotifyPassword}
+                        hasExisting={
+                          settings.music?.spotify_playback_ready ?? false
+                        }
+                      />
+                    </div>
+                    <div className="app-form-field">
+                      <span className="app-form-label">
+                        Spotify Account
+                        {settings.music?.spotify_user_configured
+                          ? " (connected)"
+                          : ""}
+                        <InfoTooltip label="About connecting your Spotify account">
+                          Signs in with your Spotify account so the Pin can read
+                          your saved songs and playlists (works on free or
+                          Premium). You must first add this redirect URI to your
+                          app in the{" "}
+                          <a
+                            href="https://developer.spotify.com/dashboard"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Spotify Developer Dashboard
+                          </a>{" "}
+                          → your app → Settings → Redirect URIs:
+                          <br />
+                          <code>{spotifyRedirectUri()}</code>
+                        </InfoTooltip>
+                      </span>
+                      <button
+                        type="button"
+                        className="app-button--file"
+                        onClick={handleSpotifyConnect}
+                        disabled={spotifyConnect === "connecting"}
+                      >
+                        {spotifyConnect === "connecting"
+                          ? "Connecting…"
+                          : settings.music?.spotify_user_configured
+                            ? "Reconnect Spotify Account"
+                            : "Connect Spotify Account"}
+                      </button>
+                      <span className="app-form-help">
+                        Reads your library (saved songs + playlists). Register the
+                        redirect URI in the ⓘ above first, and save your Client ID.
+                        Playing Spotify audio on the device also needs the
+                        librespot streaming build.
+                      </span>
+                      {spotifyConnect === "done" && (
+                        <span
+                          className="app-form-help"
+                          style={{ color: "var(--color-beam)" }}
+                        >
+                          Connected — your Spotify library is now available.
+                        </span>
+                      )}
+                      {spotifyConnect === "error" && spotifyConnectError && (
+                        <span className="app-form-error">
+                          {spotifyConnectError}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {musicProvider === "youtube" && (
+                  <p className="home-card-desc">
+                    YouTube Music search and streaming run server-side and
+                    require the server built with the{" "}
+                    <code>youtube-playback</code> feature. No account login is
+                    needed.
+                  </p>
+                )}
+
+                {musicProvider === "mopidy" && (
+                  <>
+                    <p className="home-card-desc">
+                      Delegate to a self-hosted{" "}
+                      <a
+                        href="https://docs.mopidy.com"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Mopidy
+                      </a>{" "}
+                      server — install its backend extensions (Spotify, YouTube,
+                      TIDAL, SoundCloud, local files, …) to add whichever
+                      providers you want, no per-provider setup here.
+                    </p>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Mopidy Server URL
+                        <InfoTooltip label="Where Mopidy runs">
+                          The base URL of your Mopidy HTTP server (the{" "}
+                          <code>Mopidy-HTTP</code> extension), e.g.{" "}
+                          <code>http://192.168.1.20:6680</code>. It must be
+                          reachable from the Pin — typically on the same network.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={mopidyUrl}
+                        onChange={(e) => setMopidyUrl(e.target.value)}
+                        placeholder="http://192.168.1.20:6680"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <label className="app-form-field">
+                      <span className="app-form-label">
+                        Icecast Stream URL
+                        <InfoTooltip label="Where the audio comes from">
+                          Mopidy plays audio internally, so configure it to
+                          stream its output to an Icecast server (
+                          <code>
+                            [audio] output = lamemp3enc ! shout2send …
+                          </code>
+                          ) and put that stream's URL here, e.g.{" "}
+                          <code>http://192.168.1.20:8000/mopidy</code>. The Pin
+                          plays this MP3 stream while we drive Mopidy's queue.
+                        </InfoTooltip>
+                      </span>
+                      <input
+                        type="text"
+                        value={mopidyStreamUrl}
+                        onChange={(e) => setMopidyStreamUrl(e.target.value)}
+                        placeholder="http://192.168.1.20:8000/mopidy"
+                        className="app-form-input"
+                      />
+                    </label>
+                    <span className="app-form-help">
+                      Best on the same LAN as the Pin. Changes apply immediately —
+                      no restart needed.
+                    </span>
+                  </>
                 )}
               </section>
 
