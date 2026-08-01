@@ -148,6 +148,45 @@ export interface UpdateSettingsRequest {
   };
 }
 
+/** Self-describing settings descriptor (`GET /api/settings/schema`): the device
+ *  reports its settings as typed fields so the client renders the form instead
+ *  of hardcoding each one. */
+export interface SettingsSchema {
+  sections: SettingsSection[];
+}
+
+export interface SettingsSection {
+  key: string;
+  label: string;
+  fields: SettingsField[];
+}
+
+export type SettingsFieldType =
+  | "string"
+  | "text"
+  | "secret"
+  | "bool"
+  | "enum";
+
+export interface SettingsField {
+  key: string;
+  label: string;
+  type: SettingsFieldType;
+  /** Current value; omitted for `secret` (see `configured`). */
+  value?: string | number | boolean;
+  /** For `secret`: whether a value is already set (never the value itself). */
+  configured?: boolean;
+  /** For `enum`: the selectable options. */
+  options?: SettingsFieldOption[];
+  /** Show this field only while each referenced field equals the given value. */
+  visibleWhen?: Record<string, string>;
+}
+
+export interface SettingsFieldOption {
+  value: string;
+  label: string;
+}
+
 export type CellularServiceStatus =
   | "working"
   | "off"
