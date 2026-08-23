@@ -172,10 +172,10 @@ export interface SettingsField {
   key: string;
   label: string;
   type: SettingsFieldType;
-  /** Current value; omitted for `secret` (see `configured`). */
+  /** Current value; omitted for `secret` (see `isSet`). */
   value?: string | number | boolean;
   /** For `secret`: whether a value is already set (never the value itself). */
-  configured?: boolean;
+  isSet?: boolean;
   /** For `enum`: the selectable options. */
   options?: SettingsFieldOption[];
   /** Show this field only while each referenced field equals the given value. */

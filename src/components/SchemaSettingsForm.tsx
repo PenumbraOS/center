@@ -175,7 +175,7 @@ function FieldRow({
           <SecretInput
             value={String(value)}
             onChange={onChange}
-            hasExisting={field.configured === true}
+            hasExisting={field.isSet === true}
           />
         </div>
       );

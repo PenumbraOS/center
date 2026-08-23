@@ -23,7 +23,7 @@ const schema: SettingsSchema = {
             { value: "openai-compatible", label: "OpenAI-compatible" },
           ],
         },
-        { key: "llm.api_key", label: "API Key", type: "secret", configured: true },
+        { key: "llm.api_key", label: "API Key", type: "secret", isSet: true },
         {
           key: "llm.base_url",
           label: "Base URL",
