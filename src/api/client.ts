@@ -15,6 +15,7 @@ import type {
   MemoryRecord,
   PaginatedConversations,
   Settings,
+  SettingsSchema,
   UpdateSettingsRequest,
   WifiSetEnabledResponse,
 } from "./types";
@@ -188,6 +189,10 @@ export class PinClient {
       },
       signal,
     );
+  }
+
+  getSettingsSchema(signal?: AbortSignal) {
+    return this.request<SettingsSchema>("/api/settings/schema", undefined, signal);
   }
 
   getCellularServiceStatus(signal?: AbortSignal) {
